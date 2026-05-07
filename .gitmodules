@@ -1,0 +1,3 @@
+[submodule "moida_backend"]
+	path = moida_backend
+	url = https://github.com/songhwaseong/moida_backend.git
