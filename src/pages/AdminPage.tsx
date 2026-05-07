@@ -7,6 +7,8 @@ import MemberListPage from './admin/MemberListPage';
 import WithdrawnMemberPage from './admin/WithdrawnMemberPage';
 import styles from './AdminPage.module.css';
 
+/* Admin Page  */
+
 type AdminMenu =
   | 'report' | 'suspicious' | 'chatlog' | 'sanction'
   | 'memberList' | 'withdrawn';
@@ -37,12 +39,12 @@ const AdminPage: React.FC<Props> = ({ onLogout }) => {
 
   const renderContent = () => {
     switch (menu) {
-      case 'report':     return <ReportListPage />;
-      case 'sanction':   return <SanctionPage />;
+      case 'report': return <ReportListPage />;
+      case 'sanction': return <SanctionPage />;
       case 'suspicious': return <SuspiciousPage />;
-      case 'chatlog':    return <ChatLogPage />;
+      case 'chatlog': return <ChatLogPage />;
       case 'memberList': return <MemberListPage />;
-      case 'withdrawn':  return <WithdrawnMemberPage />;
+      case 'withdrawn': return <WithdrawnMemberPage />;
     }
   };
 
