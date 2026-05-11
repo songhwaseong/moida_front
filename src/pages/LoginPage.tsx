@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import styles from './LoginPage.module.css';
 import { useToast } from '../components/Toast';
+import axiosInstance from '../api/axiosInstance';
 
 const ADMIN_CREDENTIALS = [
 
-  { email: 'admin@admin.com',       password: 'admin'       },
-  { email: 'admin@bazar.kr',        password: 'admin1234'   },
+  { email: 'admin@admin.com', password: 'admin' },
+  { email: 'admin@bazar.kr', password: 'admin1234' },
   { email: 'kmikyung761@gmail.com', password: '1' },
-  { email: 'manager@bazar.kr',      password: 'manager5678' },
-  { email: 'yalejong96@gmail.com',      password: '2' },
-  { email: 'zes1357@outlook.com',      password: '1' },
+  { email: 'manager@bazar.kr', password: 'manager5678' },
+  { email: 'yalejong96@gmail.com', password: '2' },
+  { email: 'zes1357@outlook.com', password: '1' },
   { email: 'supyoungsun@gmail.com', password: '2' },
 
 ];
@@ -37,14 +38,32 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('이메일 형식이 올바르지 않아요'); return; }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
 
+    // 1. 먼저 ADMIN_CREDENTIALS 체크 (하드코딩 관리자)
     if (ADMIN_CREDENTIALS.some(c => c.email === email && c.password === password)) {
+      setLoading(false);
       onAdmin();
       return;
     }
-    onLogin(email.split('@')[0]);
+
+    // 2. 백엔드 API 로그인 시도
+    try {
+      const response = await axiosInstance.post('/api/auth/login', { email, password });
+      const { accessToken, role, name } = response.data.data;
+
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('bazar_user_name', name);
+
+      if (role === 'ADMIN') {
+        onAdmin();
+      } else {
+        onLogin(name);
+      }
+    } catch (error: any) {
+      setError(error.response?.data?.message || '이메일 또는 비밀번호를 확인해주세요');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSocial = (provider: string) => {
