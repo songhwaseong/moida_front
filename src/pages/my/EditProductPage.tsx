@@ -6,6 +6,7 @@ import styles from '../SellPage.module.css';
 import headerStyles from './MySubPage.module.css';
 import ProductPreviewModal from '../../components/ProductPreviewModal';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
+import { CATEGORIES as HOME_CATEGORIES } from '../../data/mockData';
 
 interface Props {
   product: MyProduct;
@@ -17,7 +18,9 @@ interface Props {
 type Condition = 'S급' | 'A급' | 'B급' | 'C급';
 type TradeMethod = '직거래' | '택배' | '둘다';
 
-const CATEGORIES = ['패션', '전자기기', '가구/인테리어', '도서', '게임', '자동차', '스포츠', '악기', '기타'];
+const PRODUCT_CATEGORIES = HOME_CATEGORIES
+  .map(category => category.label)
+  .filter(label => label !== '전체');
 const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: 'S급', label: 'S급', desc: '미사용/새상품' },
   { value: 'A급', label: 'A급', desc: '거의 새것' },
@@ -206,7 +209,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
           <div className={styles.section}>
             <label className={styles.sectionTitle}>카테고리 <span className={styles.required}>*</span></label>
             <div className={`${styles.chipRow} ${styles.chipWrap}`}>
-              {CATEGORIES.map(c => (
+              {PRODUCT_CATEGORIES.map(c => (
                 <button key={c} className={`${styles.chip} ${styles.chipSm} ${category === c ? styles.chipActive : ''}`}
                   onClick={() => { setCategory(c); setErrors(p => ({ ...p, category: '' })); }}>{c}</button>
               ))}

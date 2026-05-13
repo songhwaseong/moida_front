@@ -3,6 +3,7 @@ import styles from './SellPage.module.css';
 import { useToast } from '../components/Toast';
 import ProductPreviewModal from '../components/ProductPreviewModal';
 import LeaveConfirmModal from '../components/LeaveConfirmModal';
+import { CATEGORIES as HOME_CATEGORIES } from '../data/mockData';
 
 interface Props {
   onBack: () => void;
@@ -14,7 +15,9 @@ type Condition = 'S급' | 'A급' | 'B급' | 'C급';
 type TradeMethod = '직거래' | '택배' | '둘다';
 type Step = 1 | 2 | 3;
 
-const CATEGORIES = ['패션', '전자기기', '가구/인테리어', '도서', '게임', '자동차', '스포츠', '악기', '기타'];
+const PRODUCT_CATEGORIES = HOME_CATEGORIES
+  .map(category => category.label)
+  .filter(label => label !== '전체');
 const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: 'S급', label: 'S급', desc: '미사용/새상품' },
   { value: 'A급', label: 'A급', desc: '거의 새것' },
@@ -310,7 +313,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
             <div className={styles.section}>
               <label className={styles.sectionTitle}>카테고리 <span className={styles.required}>*</span></label>
               <div className={styles.chipGrid}>
-                {CATEGORIES.map(c => (
+                {PRODUCT_CATEGORIES.map(c => (
                   <button
                     key={c}
                     className={`${styles.chip} ${category === c ? styles.chipActive : ''}`}
