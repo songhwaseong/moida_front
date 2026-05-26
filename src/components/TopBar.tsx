@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import moidaLogoMark from '../assets/moidaLogoMark.png';
 import styles from './TopBar.module.css';
 
 const BellIcon = () => (
@@ -35,7 +36,11 @@ const TopBar: React.FC<TopBarProps> = ({
   return (
     <header className={styles.topbar}>
       <div className={styles.row}>
-        <div className={styles.logo}>MOIDA</div>
+        <div className={styles.logo} aria-label="MOIDA">
+          <span>M</span>
+          <img className={styles.logoMark} src={moidaLogoMark} alt="" aria-hidden="true" />
+          <span>IDA</span>
+        </div>
         <div className={styles.icons}>
           <button className={styles.iconBtn} aria-label="알림" onClick={onBellClick}>
             <BellIcon />

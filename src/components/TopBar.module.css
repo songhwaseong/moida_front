@@ -19,6 +19,18 @@
   font-size: 26px;
   color: var(--primary);
   letter-spacing: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  line-height: 1;
+}
+
+.logoMark {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+  margin: 0 -2px;
 }
 
 .icons {

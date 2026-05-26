@@ -1,5 +1,6 @@
 import React from 'react';
 import type { MainTab, NavTab } from '../types';
+import moidaLogoMark from '../assets/moidaLogoMark.png';
 import styles from './PCLayout.module.css';
 import Footer from './Footer';
 
@@ -77,7 +78,9 @@ const PCLayout: React.FC<Props> = ({
         <div className={styles.headerInner}>
           <button className={styles.logo} onClick={() => onMainTabChange('홈')}>
   <span className={`${styles.logoMo} ${styles.letter1}`}>M</span>
-  <span className={`${styles.logoMo} ${styles.letter2}`}>O</span>
+  <span className={`${styles.logoMo} ${styles.letter2}`}>
+    <img className={styles.logoMark} src={moidaLogoMark} alt="" aria-hidden="true" />
+  </span>
   <span className={`${styles.logoIda} ${styles.letter3}`}>I</span>
   <span className={`${styles.logoIda} ${styles.letter4}`}>D</span>
   <span className={`${styles.logoIda} ${styles.letter5}`}>A</span>

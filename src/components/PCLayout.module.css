@@ -53,6 +53,14 @@
   display: inline-block;
 }
 
+.logoMark {
+  width: 34px;
+  height: 34px;
+  display: block;
+  object-fit: contain;
+  margin: 0 -2px -3px;
+}
+
 .letter1:hover,
 .letter2:hover,
 .letter3:hover,
