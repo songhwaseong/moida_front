@@ -229,6 +229,54 @@ const App: React.FC = () => {
     setLoggedInUserName(userName);
     setIsGuest(false); setAuthScreen(null); setScreen({ type: 'home' }); setNavTab('home');
   };
+
+  // 소셜 로그인 콜백 처리 - 앱 시작 시 URL 확인
+  useEffect(() => {
+    const path = window.location.pathname;
+    const code = new URLSearchParams(window.location.search).get('code');
+    const state = new URLSearchParams(window.location.search).get('state');
+
+    if (!code) return; // 일반 접속이면 무시
+
+    const handleSocialCallback = async () => {
+      try {
+        let endpoint = '';
+        let body: Record<string, string> = { code };
+
+        if (path === '/member/kauth') {
+          endpoint = '/api/auth/kakaoLogin';
+        } else if (path === '/member/nauth') {
+          endpoint = '/api/auth/naverLogin';
+          body = { code, state: state || '' };
+        } else if (path === '/member/gauth') {
+          endpoint = '/api/auth/googleLogin';
+        } else {
+          return; // 소셜 콜백 URL이 아니면 무시
+        }
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        const { accessToken, name } = data.data;
+
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('bazar_user_name', name);
+        localStorage.setItem('bazar_logged_in', 'true');
+
+        // URL 정리 후 홈으로
+        window.history.replaceState({}, '', '/');
+        login(name); // 기존 login 함수 호출
+      } catch (e) {
+        console.error('소셜 로그인 실패', e);
+      }
+    };
+
+    handleSocialCallback();
+  }, []); // 앱 최초 마운트 시 한 번만 실행
+
   const logout = () => {
     localStorage.removeItem('bazar_logged_in');
     localStorage.removeItem('bazar_user_name');

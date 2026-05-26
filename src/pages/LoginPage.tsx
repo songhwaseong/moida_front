@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './LoginPage.module.css';
-import { useToast } from '../components/ToastContext';
 import axiosInstance from '../api/axiosInstance';
+import { KKO_CLIENT_ID, KKO_REDIRECT_URI, NAV_CLIENT_ID, NAV_REDIRECT_URI, NAV_STATE, GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI } from '../config/config';
 
 const ADMIN_CREDENTIALS = [
   { email: 'admin@admin.com', password: 'admin' },
@@ -27,7 +27,6 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccount, onGuest }) => {
-  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -69,8 +68,20 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
     }
   };
 
-  const handleSocial = (provider: string) => {
-    showToast(`${provider} 로그인은 백엔드 연동 후 사용 가능합니다`, 'info');
+  // 각 소셜 OAuth 인증 페이지 URL로 redirect
+  const handleKakaoLogin = () => {
+    const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${KKO_CLIENT_ID}&redirect_uri=${KKO_REDIRECT_URI}`;
+    window.location.href = url;
+  };
+
+  const handleNaverLogin = () => {
+    const url = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAV_CLIENT_ID}&redirect_uri=${NAV_REDIRECT_URI}&state=${NAV_STATE}`;
+    window.location.href = url;
+  };
+
+  const handleGoogleLogin = () => {
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&scope=email profile`;
+    window.location.href = url;
   };
 
   return (
@@ -153,15 +164,15 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
       </div>
 
       <div className={styles.socialBtns}>
-        <button className={`${styles.socialBtn} ${styles.kakao}`} onClick={() => handleSocial('카카오')}>
+        <button className={`${styles.socialBtn} ${styles.kakao}`} onClick={handleKakaoLogin}>
           <span className={styles.socialIcon}>💬</span>
           카카오로 로그인
         </button>
-        <button className={`${styles.socialBtn} ${styles.naver}`} onClick={() => handleSocial('네이버')}>
+        <button className={`${styles.socialBtn} ${styles.naver}`} onClick={handleNaverLogin}>
           <span className={styles.socialIcon} style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>N</span>
           네이버로 로그인
         </button>
-        <button className={`${styles.socialBtn} ${styles.google}`} onClick={() => handleSocial('구글')}>
+        <button className={`${styles.socialBtn} ${styles.google}`} onClick={handleGoogleLogin}>
           <span className={styles.socialIcon}>G</span>
           구글로 로그인
         </button>
