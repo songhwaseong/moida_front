@@ -118,7 +118,16 @@ const App: React.FC = () => {
   const [authScreen, setAuthScreen] = useState<AuthScreen>(() =>
     localStorage.getItem('bazar_logged_in') === 'true' && !!localStorage.getItem('accessToken') ? null : 'login'
   );
-  const [isGuest, setIsGuest] = useState(false);
+  const [isGuest, setIsGuest] = useState(() => {
+    // 소셜 로그인 콜백 URL이면 임시 guest 모드로 시작 → LoginPage 안 보임
+    const path = window.location.pathname;
+    const code = new URLSearchParams(window.location.search).get('code');
+    return !!(code && (
+      path === '/member/kauth' ||
+      path === '/member/nauth' ||
+      path === '/member/gauth'
+    ));
+  });
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [alertConfirmCb, setAlertConfirmCb] = useState<(() => void) | null>(null);
   const [alertCancelCb, setAlertCancelCb] = useState<(() => void) | null>(null);
