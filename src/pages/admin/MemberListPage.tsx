@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { MEMBERS, type Member } from '../../data/memberData';
+import React, { useState, useEffect } from 'react';
+import { type Member } from '../../data/memberData';
 import MemberDetailPage from './MemberDetailPage';
 import styles from './admin.module.css';
+import axiosInstance from '../../api/axiosInstance';
 
 type StatusFilter = 'all' | 'active' | 'suspended' | 'permanent' | 'withdrawn';
 
@@ -20,9 +21,36 @@ const MemberListPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [selectedMemberNo, setSelectedMemberNo] = useState<string | null>(null);
-  const [list, setList] = useState<Member[]>(MEMBERS);
+  const [list, setList] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 5;
+
+  const currentRole = localStorage.getItem('bazar_user_role');
+
+  const handleRoleToggle = async (m: Member) => {
+    if (!m.id) { alert('API 연동 후 사용 가능합니다'); return; }
+    const newRole = m.role === 'MANAGER' ? 'USER' : 'MANAGER';
+    const label = newRole === 'MANAGER' ? '매니저로 지정' : '매니저 해제';
+    if (!window.confirm(`${m.name}을 ${label}하시겠습니까?`)) return;
+
+    try {
+      await axiosInstance.patch(`/admin/members/${m.id}/role`, { role: newRole });
+      setList(prev => prev.map(item =>
+        item.memberNo === m.memberNo ? { ...item, role: newRole } : item
+      ));
+      alert(`${label} 완료`);
+    } catch {
+      alert('역할 변경에 실패했습니다');
+    }
+  };
+
+  useEffect(() => {
+    axiosInstance.get('/admin/members')
+      .then(res => setList(res.data.data))
+      .catch(() => setList([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = list.filter(m => {
     const matchStatus = statusFilter === 'all' || m.status === statusFilter;
@@ -58,6 +86,11 @@ const MemberListPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#8B8FA8' }}>
+          회원 목록을 불러오는 중...
+        </div>
+      )}
       <div className={styles.header}>
         <h1 className={styles.title}>회원 목록</h1>
         <p className={styles.subtitle}>전체 회원을 조회하고 관리합니다</p>
@@ -94,9 +127,9 @@ const MemberListPage: React.FC = () => {
           onChange={e => { setStatusFilter(e.target.value as StatusFilter); setCurrentPage(1); }}
           style={{ padding: '8px 12px', border: '1px solid #E0E0E0', borderRadius: 8, fontSize: 13, color: '#4A4A6A', background: '#fff', cursor: 'pointer', fontFamily: 'Noto Sans KR, sans-serif', outline: 'none', minWidth: 110 }}
         >
-          {(['all','active','suspended','permanent','withdrawn'] as StatusFilter[]).map(f => (
+          {(['all', 'active', 'suspended', 'permanent', 'withdrawn'] as StatusFilter[]).map(f => (
             <option key={f} value={f}>
-              {{ all:'전체', active:'정상', suspended:'정지', permanent:'영구정지', withdrawn:'탈퇴' }[f]}
+              {{ all: '전체', active: '정상', suspended: '정지', permanent: '영구정지', withdrawn: '탈퇴' }[f]}
             </option>
           ))}
         </select>
@@ -112,7 +145,7 @@ const MemberListPage: React.FC = () => {
           <col style={{ width: '80px' }} />
           <col style={{ width: '60px' }} />
           <col style={{ width: '90px' }} />
-          <col style={{ width: '70px' }} />
+          <col style={{ width: '150px' }} />
         </colgroup>
         <thead>
           <tr>
@@ -144,12 +177,31 @@ const MemberListPage: React.FC = () => {
               <td style={{ fontSize: 12 }}>
                 <span style={{ color: '#534AB7' }}>{m.bidCount}</span>
               </td>
-
               <td>
                 <span className={styles.badge} style={statusColor(m.status)}>{statusLabel(m.status)}</span>
               </td>
               <td>
-                <button className={styles.actionBtn} onClick={() => setSelectedMemberNo(m.memberNo)}>상세</button>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {/* ADMIN만 버튼 표시, 대상이 ADMIN이면 숨김 */}
+                  {currentRole === 'ADMIN' && m.role !== 'ADMIN' && (
+                    <button
+                      className={styles.actionBtn}
+                      style={{
+                        fontSize: 11,
+                        padding: '3px 7px',
+                        background: m.role === 'MANAGER' ? '#8B8FA8' : '#534AB7',
+                        color: '#fff',
+                        border: 'none'
+                      }}
+                      onClick={() => handleRoleToggle(m)}
+                    >
+                      {m.role === 'MANAGER' ? '매니저해제' : '매니저지정'}
+                    </button>
+                  )}
+                  <button className={styles.actionBtn} onClick={() => setSelectedMemberNo(m.memberNo)}>
+                    상세
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

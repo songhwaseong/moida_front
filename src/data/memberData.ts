@@ -1,4 +1,5 @@
 export interface Member {
+  id?: number;
   memberNo: string;
   name: string;
   email: string;
@@ -13,6 +14,7 @@ export interface Member {
   suspendUntil?: string;
   reportCount: number;
   sanctionCount: number;
+  role?: 'USER' | 'MANAGER' | 'ADMIN';             // 역할 (API 연동 시 채워짐)
 }
 
 export interface MemberTransaction {

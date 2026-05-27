@@ -269,11 +269,12 @@ const App: React.FC = () => {
           body: JSON.stringify(body),
         });
         const data = await res.json();
-        const { accessToken, name } = data.data;
+        const { accessToken, name, role } = data.data;
 
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('bazar_user_name', name);
         localStorage.setItem('bazar_logged_in', 'true');
+        localStorage.setItem('bazar_user_role', role);
 
         // URL 정리 후 홈으로
         window.history.replaceState({}, '', '/');

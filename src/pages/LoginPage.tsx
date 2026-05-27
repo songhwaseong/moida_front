@@ -3,16 +3,6 @@ import styles from './LoginPage.module.css';
 import axiosInstance from '../api/axiosInstance';
 import { KKO_CLIENT_ID, KKO_REDIRECT_URI, NAV_CLIENT_ID, NAV_REDIRECT_URI, NAV_STATE, GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI } from '../config/config';
 
-const ADMIN_CREDENTIALS = [
-  { email: 'admin@admin.com', password: 'admin' },
-  { email: 'admin@bazar.kr', password: 'admin1234' },
-  { email: 'kmikyung761@gmail.com', password: '1' },
-  { email: 'manager@bazar.kr', password: 'manager5678' },
-  { email: 'yalejong96@gmail.com', password: '2' },
-  { email: 'zes1357@outlook.com', password: '1' },
-  { email: 'supyoungsun@gmail.com', password: '2' },
-];
-
 interface Props {
   onLogin: (name?: string) => void;
   onAdmin: () => void;
@@ -41,13 +31,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
 
     setLoading(true);
 
-    // 1. 먼저 ADMIN_CREDENTIALS 체크 (하드코딩 관리자)
-    if (ADMIN_CREDENTIALS.some(c => c.email === email && c.password === password)) {
-      setLoading(false);
-      onAdmin();
-      return;
-    }
-
     // 2. 백엔드 API 로그인 시도
     try {
       const response = await axiosInstance.post('/auth/login', { email, password }); // ← /api 중복 제거
@@ -55,8 +38,9 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
 
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('bazar_user_name', name);
+      localStorage.setItem('bazar_user_role', role);
 
-      if (role === 'ADMIN') {
+      if (role === 'ADMIN' || role === 'MANAGER') {
         onAdmin();
       } else {
         onLogin(name);
