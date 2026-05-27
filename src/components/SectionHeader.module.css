@@ -3,11 +3,27 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  gap: 12px;
+}
+
+/* 타이틀 + 보조 슬롯(정렬 칩 등)을 한 묶음으로 왼쪽 정렬 */
+.leftGroup {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-width: 0;
+  flex: 1;
 }
 
 .title {
   font-size: 16px;
   font-weight: 700;
+}
+
+.extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .more {
@@ -16,4 +32,5 @@
   background: none;
   border: none;
   cursor: pointer;
+  flex-shrink: 0;
 }

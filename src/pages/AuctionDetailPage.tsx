@@ -3,6 +3,7 @@ import { getProduct, toAuctionDetail } from '../api/products';
 import { toggleLike } from '../api/likes';
 import { buyNowProduct, placeProductBid, type BidType } from '../api/bids';
 import { createProductInquiry, getProductInquiries, type InquiryView } from '../api/inquiries';
+import { getWallet } from '../api/wallet';
 import type { AuctionDetail } from '../types';
 import styles from './AuctionDetailPage.module.css';
 import { useToast } from '../components/ToastContext';
@@ -67,7 +68,49 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
     }
   };
 
-  const USER_BALANCE = 267000;
+  // ── 보유 잔액 (지갑 API 연동) ──────────────────────────────────
+  // 입찰 모달에서 "잔액 부족" 검증과 표시에 쓰는 값.
+  // 과거에는 USER_BALANCE 상수로 하드코딩돼 있었으나, 실제 회원 지갑 잔액을
+  // GET /api/wallet 에서 받아오도록 변경.
+  // - 마운트(로그인 상태일 때) 1회 조회
+  // - 입찰/즉시낙찰 모달을 열 때마다 재조회 (다른 탭에서 충전·출금한 경우 반영)
+  // - 입찰 성공 직후 재조회 (낙찰 차감 반영)
+  //
+  // 비로그인 상태의 표시값(0) 은 useEffect 내 setState 가 아닌 derived 값으로 처리한다.
+  // (react-hooks/set-state-in-effect 규칙: effect 안에서 동기 setState 금지)
+  const [fetchedBalance, setFetchedBalance] = useState(0);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const userBalance = isLoggedIn ? fetchedBalance : 0;
+
+  // 지갑 잔액을 다시 가져와 state 에 반영한다. 비로그인 상태에서는 호출하지 않는다.
+  // 실패해도 사용자에게 별도 토스트는 띄우지 않고(잔액 부족 검증으로만 노출되므로) 콘솔에만 남긴다.
+  const refreshBalance = async () => {
+    if (!isLoggedIn) return;
+    setIsBalanceLoading(true);
+    try {
+      const wallet = await getWallet();
+      setFetchedBalance(wallet.balance);
+    } catch (error) {
+      console.error('Failed to load wallet balance', error);
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // 비로그인이면 fetch 하지 않고 종료. 표시값은 derived(userBalance) 로 0 처리.
+    if (!isLoggedIn) return;
+    // refreshBalance() 는 내부에서 setIsBalanceLoading 을 동기 호출하므로 effect 에서
+    // 그대로 부르면 react-hooks/set-state-in-effect 규칙을 위반한다.
+    // 초기 진입 시점은 모달이 열려있지 않아 로딩 인디케이터가 불필요하므로,
+    // 여기서는 fetch + setState 만 인라인으로 처리하고 모달 오픈/입찰 후에만 refreshBalance 를 쓴다.
+    let active = true;
+    getWallet()
+      .then((wallet) => { if (active) setFetchedBalance(wallet.balance); })
+      .catch((error) => { if (active) console.error('Failed to load wallet balance', error); });
+    return () => { active = false; };
+    // 로그인 여부가 바뀌거나 다른 경매 상세로 전환되면 다시 조회한다.
+  }, [isLoggedIn, itemId]);
 
   // 경매 상세도 목업 대신 DB 상품 상세 API를 사용한다.
   // API 응답을 기존 AuctionDetail UI 타입으로 변환해 입찰/타이머 UI는 그대로 재사용한다.
@@ -167,6 +210,8 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
       setBidInput('');
       setShowBidModal(false);
       setShowInstantModal(false);
+      // 입찰이 성공하면 잔액에서 차감되므로 즉시 다시 가져온다.
+      void refreshBalance();
       showToast(`${amount.toLocaleString()} 입찰 완료!`, 'success');
     } catch (error: unknown) {
       showToast(getApiErrorMessage(error, '입찰 등록에 실패했습니다.'), 'error');
@@ -187,8 +232,8 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
       showToast(`최소 입찰가는 ${minBid.toLocaleString()}원입니다.`, 'error');
       return;
     }
-    if (amount > USER_BALANCE) {
-      showToast(`잔액 부족\n보유: ${USER_BALANCE.toLocaleString()} / 입찰: ${amount.toLocaleString()}`, 'error');
+    if (amount > userBalance) {
+      showToast(`잔액 부족\n보유: ${userBalance.toLocaleString()} / 입찰: ${amount.toLocaleString()}`, 'error');
       return;
     }
     void submitBid(amount, 'NORMAL');
@@ -352,6 +397,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
                   className={styles.inlineBidBtn}
                   onClick={() => {
                     if (!isLoggedIn) { onRequireLogin?.(); return; }
+                    void refreshBalance();
                     setShowBidModal(true);
                   }}
                   disabled={isEnded}
@@ -362,6 +408,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
                   className={styles.inlineInstantBtn}
                   onClick={() => {
                     if (!isLoggedIn) { onRequireLogin?.(); return; }
+                    void refreshBalance();
                     setShowInstantModal(true);
                   }}
                   disabled={isEnded || !item.immediatePrice}
@@ -511,7 +558,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
       {/* 입찰 모달 */}
       {showBidModal && (() => {
         const bidAmount = parseInt(bidInput.replace(/,/g, ''), 10);
-        const isInsufficient = !isNaN(bidAmount) && bidAmount > USER_BALANCE;
+        const isInsufficient = !isNaN(bidAmount) && bidAmount > userBalance;
         const minBid = currentPrice + (item.minBidUnit ?? 1000);
         return (
           <div className={styles.modalOverlay} onClick={() => setShowBidModal(false)}>
@@ -521,7 +568,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
               <div className={styles.balanceRow}>
                 <span className={styles.balanceLabel}>보유 잔액</span>
                 <span className={`${styles.balanceValue} ${isInsufficient ? styles.balanceInsufficient : ''}`}>
-                  {USER_BALANCE.toLocaleString()}
+                  {isBalanceLoading ? '조회 중…' : userBalance.toLocaleString()}
                 </span>
               </div>
               <input
@@ -534,7 +581,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
               />
               {isInsufficient && (
                 <p className={styles.insufficientMsg}>
-                  잔액이 부족해요. {(bidAmount - USER_BALANCE).toLocaleString()} 더 필요해요
+                  잔액이 부족해요. {(bidAmount - userBalance).toLocaleString()} 더 필요해요
                 </p>
               )}
               <div className={styles.modalBtns}>
@@ -553,7 +600,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
 
       {/* 즉시낙찰 모달 */}
       {showInstantModal && item.immediatePrice && (() => {
-        const isInsufficient = USER_BALANCE < item.immediatePrice;
+        const isInsufficient = userBalance < item.immediatePrice;
         return (
           <div className={styles.modalOverlay} onClick={() => setShowInstantModal(false)}>
             <div className={styles.modal} onClick={e => e.stopPropagation()}>
@@ -562,7 +609,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
               <div className={styles.balanceRow}>
                 <span className={styles.balanceLabel}>보유 잔액</span>
                 <span className={`${styles.balanceValue} ${isInsufficient ? styles.balanceInsufficient : ''}`}>
-                  {USER_BALANCE.toLocaleString()}
+                  {isBalanceLoading ? '조회 중…' : userBalance.toLocaleString()}
                 </span>
               </div>
               <input
@@ -573,7 +620,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
               />
               {isInsufficient && (
                 <p className={styles.insufficientMsg}>
-                  잔액이 부족해요. {(item.immediatePrice - USER_BALANCE).toLocaleString()} 더 필요해요
+                  잔액이 부족해요. {(item.immediatePrice - userBalance).toLocaleString()} 더 필요해요
                 </p>
               )}
               <div className={styles.modalBtns}>

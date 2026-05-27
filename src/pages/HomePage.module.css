@@ -10,6 +10,30 @@
   padding: 16px 20px 0;
 }
 
+/* 가격 정렬 토글 — SectionHeader 의 rightSlot 안에 들어가도록 패딩 없이 칩만 가로 정렬 */
+.sortBar {
+  display: flex;
+  gap: 6px;
+}
+.sortChip {
+  padding: 4px 10px;
+  background: #F4F5F8;
+  color: #5A5E72;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sortChip:hover { background: #ECEEF3; }
+.sortChipActive {
+  background: #E6F1FB;
+  color: #185FA5;
+  border-color: #B5D4F4;
+}
+
 /* ── 캐러셀 래퍼 ── */
 .carouselWrap {
   position: relative;

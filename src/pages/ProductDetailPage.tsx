@@ -198,9 +198,14 @@ const ProductDetailPage: React.FC<Props> = ({ productId, onBack, onSellerClick, 
               <strong>{item.category ?? '전자기기'}</strong>
             </div>
 
-            {/* 상품 상태 배지 */}
+            {/* 상품 상태 + 부가 태그 칩 — 상품명 위에 통일된 한 줄로 노출.
+                'S급' 같은 condition 칩과 '거의새것'/'상태양호' 같은 tag 칩을 함께 배치한다.
+                (free/auction 태그는 본문 흐름상 노출하지 않음.) */}
             <div className={styles.categoryRow}>
               <span className={styles.conditionTag}>{item.condition}</span>
+              {item.tags.filter(tag => tag !== 'free' && tag !== 'auction').map((tag) => (
+                <span key={tag} className={`${styles.tag} ${styles[tag]}`}>{TAG_LABEL[tag]}</span>
+              ))}
             </div>
 
             {/* 상품명 + 좋아요 */}
@@ -236,14 +241,6 @@ const ProductDetailPage: React.FC<Props> = ({ productId, onBack, onSellerClick, 
               </div>
             )}
             <p className={styles.meta}>{item.location} · <span className={styles.timeGlow}>{item.timeAgo}</span></p>
-
-            {/* 태그 */}
-            <div className={styles.tagRow}>
-              {item.tags.filter(tag => tag !== 'free' && tag !== 'auction').map((tag) => (
-                <span key={tag} className={`${styles.tag} ${styles[tag]}`}>{TAG_LABEL[tag]}</span>
-              ))}
-            </div>
-
 
             {/* 판매자 */}
             <div className={styles.sellerRow}>

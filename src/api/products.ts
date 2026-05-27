@@ -57,9 +57,15 @@ export type ProductStatusFilter =
   | 'SOLD'
   | 'FAILED';
 
-// 인기 정렬은 백엔드에서 viewCount DESC, id DESC 순으로 처리한다.
-export type ProductSortKey = 'popular';
+// 상품 목록 정렬 키.
+//   - 'popular'    : 백엔드에서 viewCount DESC, id DESC 순으로 처리 (인기 화면용)
+//   - 'price_asc'  : 카드에 표시되는 가격(=auction.currentPrice, 없으면 product.price) 오름차순
+//   - 'price_desc' : 같은 기준 내림차순
+// 미지정(undefined)이면 백엔드 기본값(createdAt DESC = 최신 등록순).
+export type ProductSortKey = 'popular' | 'price_asc' | 'price_desc';
 
+// 상품 목록 조회 API. 카테고리/상태/정렬/페이지크기 파라미터는 모두 선택적이며,
+// 서버 쪽에서는 "category 필터 → 상태 필터 → 정렬 → size 클램프(최대 100)" 순으로 처리한다.
 export const getProducts = async (params?: {
   category?: string | null;
   status?: ProductStatusFilter;

@@ -544,6 +544,8 @@ const App: React.FC = () => {
         onSwitchToAdmin={switchToAdmin}
         onTermsClick={() => { setTermsInitialTab('이용약관'); setNavTab('my'); setScreen({ type: 'myMenu', menu: '이용약관' }); }}
         onPrivacyClick={() => { setTermsInitialTab('개인정보처리방침'); setNavTab('my'); setScreen({ type: 'myMenu', menu: '이용약관' }); }}
+        onMyHomeClick={() => goNav('my')}
+        onMyMenuClick={(menu) => { setNavTab('my'); setScreen({ type: 'myMenu', menu: menu as MyMenuKey }); }}
       >
         {isHomePage ? (
           <>
