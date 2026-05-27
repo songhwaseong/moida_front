@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { withdrawMe } from '../api/member';
 import styles from './MyPage.module.css';
 
 type MenuKey = '입찰 내역'|'관심 목록'|'내 계좌'|'받은 후기'|'내 주소 관리'|'알림 설정'|'자주 묻는 질문'|'고객센터'|'이용약관'|'배송 조회'|'이용 가이드'|'내 등록 상품'|'내 문의'|'회원탈퇴';
@@ -60,6 +61,24 @@ interface Props {
 const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
   const [mannerTemp] = useState(36.8);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
+
+  const handleWithdraw = async () => {
+    setWithdrawLoading(true);
+    setWithdrawError('');
+
+    try {
+      await withdrawMe();
+      setShowWithdrawModal(false);
+      onLogout?.();
+    } catch (error) {
+      console.error('Failed to withdraw member', error);
+      setWithdrawError('회원탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   return (
     <main className={styles.main}>
@@ -111,7 +130,7 @@ const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
       ))}
 
       <div className={styles.menuGroup}>
-        <button className={`${styles.menuItem} ${styles.withdrawItem}`} onClick={() => setShowWithdrawModal(true)}>
+        <button className={`${styles.menuItem} ${styles.withdrawItem}`} onClick={() => { setWithdrawError(''); setShowWithdrawModal(true); }}>
           <span className={`${styles.menuIcon} ${styles.withdrawIcon}`}>{MENU_ICONS['회원탈퇴']}</span>
           <span className={`${styles.menuLabel} ${styles.withdrawLabel}`}>회원탈퇴</span>
         </button>
@@ -129,11 +148,18 @@ const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
             </div>
             <div className={styles.modalTitle}>정말 탈퇴하시겠어요?</div>
             <div className={styles.modalDesc}>
-              탈퇴하면 모든 데이터가 삭제되며<br />복구할 수 없습니다.
+              탈퇴 후 계정 이용이 중지되며<br />거래 및 관리 이력은 정책에 따라 보존됩니다.
             </div>
+            {withdrawError && (
+              <div style={{ color: '#E24B4A', fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+                {withdrawError}
+              </div>
+            )}
             <div className={styles.modalBtns}>
-              <button className={styles.modalCancelBtn} onClick={() => setShowWithdrawModal(false)}>취소</button>
-              <button className={styles.modalWithdrawBtn} onClick={() => { setShowWithdrawModal(false); onLogout?.(); }}>탈퇴하기</button>
+              <button className={styles.modalCancelBtn} onClick={() => setShowWithdrawModal(false)} disabled={withdrawLoading}>취소</button>
+              <button className={styles.modalWithdrawBtn} onClick={() => void handleWithdraw()} disabled={withdrawLoading}>
+                {withdrawLoading ? '처리 중...' : '탈퇴하기'}
+              </button>
             </div>
           </div>
         </div>
