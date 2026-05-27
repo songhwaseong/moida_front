@@ -44,6 +44,16 @@
 
 .field { display: flex; flex-direction: column; gap: 5px; }
 
+.errorText {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #FFF3F3;
+  color: #B03030;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .label {
   font-size: 12px;
   font-weight: 600;
@@ -102,6 +112,14 @@
   transition: opacity 0.15s;
 }
 .saveBtn:hover { opacity: 0.88; }
+
+.cancelBtn:disabled,
+.saveBtn:disabled,
+.searchBtn:disabled,
+.closeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

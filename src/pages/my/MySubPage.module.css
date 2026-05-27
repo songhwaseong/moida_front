@@ -98,6 +98,7 @@
   font-size: 12px; font-weight: 500; background: none; cursor: pointer;
   font-family: 'Noto Sans KR', sans-serif; color: var(--text);
 }
+.addrBtn:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* 알림 설정 */
 .settingItem {
@@ -174,6 +175,7 @@
   background: none; font-size: 14px; color: var(--muted); cursor: pointer;
   font-family: 'Noto Sans KR', sans-serif;
 }
+.addBtn:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .addrZonecode {
   font-size: 12px;

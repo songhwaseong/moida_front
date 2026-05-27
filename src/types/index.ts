@@ -74,6 +74,16 @@ export interface ProductDetail extends Product {
 
 export type ProductTag = 'new' | 'auction' | 'free' | 'good';
 
+export interface Address {
+  id: number;
+  name: string;
+  zonecode: string;
+  address: string;
+  detail: string;
+  phone: string;
+  isDefault: boolean;
+}
+
 export interface Category {
   id: number;
   emoji: string;
