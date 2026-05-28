@@ -41,6 +41,8 @@ axiosInstance.interceptors.response.use(
             // 둘 중 하나만 지우면 새로고침 후에도 홈으로 들어가 무한 401 루프가 발생한다.
             localStorage.removeItem("accessToken");
             localStorage.removeItem("bazar_logged_in");
+            localStorage.removeItem("bazar_user_name");
+            localStorage.removeItem("bazar_user_role");
 
             // 라우터를 쓰지 않는 SPA라서 별도 경로는 의미가 없고, '/' 로 리로드하면
             // 위 플래그가 비어있어 App.tsx 가 자동으로 로그인 화면을 보여준다.

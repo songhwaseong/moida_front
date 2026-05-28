@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  getWithdrawnMembers,
-  type AdminWithdrawnMemberDto,
+  getDeactivatedMembers,
+  type AdminDeactivatedMemberDto,
 } from '../../api/adminMembers';
 import styles from './admin.module.css';
 
@@ -17,7 +17,7 @@ const formatDate = (value: string | null) => {
 };
 
 const WithdrawnMemberPage: React.FC = () => {
-  const [members, setMembers] = useState<AdminWithdrawnMemberDto[]>([]);
+  const [members, setMembers] = useState<AdminDeactivatedMemberDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
@@ -26,12 +26,17 @@ const WithdrawnMemberPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getWithdrawnMembers();
+      const data = await getDeactivatedMembers();
       setMembers(data);
       setPage(1);
     } catch (loadError) {
       console.error('Failed to load withdrawn members', loadError);
-      setError('탈퇴 회원 목록을 불러오지 못했습니다.');
+      const status = loadError && typeof loadError === 'object' && 'response' in loadError
+        ? (loadError as { response?: { status?: number } }).response?.status
+        : undefined;
+      setError(status === 401 || status === 403
+        ? '관리자 인증이 필요합니다. 관리자 계정으로 다시 로그인해주세요.'
+        : '탈퇴 회원 목록을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }

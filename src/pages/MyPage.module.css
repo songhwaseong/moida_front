@@ -142,9 +142,9 @@
   font-family: 'Noto Sans KR', sans-serif;
 }
 
-.withdrawItem:active { background: #FFF5F5; }
-.withdrawIcon { background: #FFF0F0; color: #E24B4A; }
-.withdrawLabel { color: #E24B4A; }
+.accountDeactivationItem:active { background: #FFF5F5; }
+.accountDeactivationIcon { background: #FFF0F0; color: #E24B4A; }
+.accountDeactivationLabel { color: #E24B4A; }
 
 .modalOverlay {
   position: fixed;
@@ -161,9 +161,14 @@
   border-radius: 16px;
   padding: 28px 24px 20px;
   width: calc(100% - 48px);
-  max-width: 320px;
+  max-width: 360px;
   text-align: center;
   box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+}
+
+.accountDeactivationModal {
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 
 .modalIcon { margin-bottom: 12px; }
@@ -184,7 +189,13 @@
   font-family: 'Noto Sans KR', sans-serif;
 }
 
-.modalWithdrawBtn {
+.modalCancelBtn:disabled,
+.modalAccountDeactivationBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.modalAccountDeactivationBtn {
   flex: 1;
   padding: 12px;
   border: none;
@@ -195,4 +206,136 @@
   color: #fff;
   cursor: pointer;
   font-family: 'Noto Sans KR', sans-serif;
+}
+
+.accountDeactivationProgress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.accountDeactivationStepDot {
+  padding: 6px 0;
+  border-radius: 999px;
+  background: #F4F5F7;
+  color: #8B8FA8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.accountDeactivationStepActive {
+  background: #FFF0F0;
+  color: #E24B4A;
+}
+
+.noticeList {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.noticeList p {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #F8F8F9;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.noticeCheckRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.noticeCheckRow input {
+  width: 16px;
+  height: 16px;
+  accent-color: #E24B4A;
+  flex-shrink: 0;
+}
+
+.accountDeactivationHelp {
+  margin: 0 0 14px;
+  color: #8B8FA8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.accountDeactivationField {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.accountDeactivationField label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.accountDeactivationField input,
+.accountDeactivationField select,
+.accountDeactivationField textarea {
+  width: 100%;
+  border: 1px solid #E6E2D8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: 'Noto Sans KR', sans-serif;
+  background: #fff;
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.accountDeactivationField textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.accountDeactivationError {
+  margin-bottom: 12px;
+  color: #E24B4A;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.accountDeactivationSpinner {
+  width: 34px;
+  height: 34px;
+  margin: 8px auto 16px;
+  border: 3px solid #F4D1D1;
+  border-top-color: #E24B4A;
+  border-radius: 50%;
+  animation: accountDeactivationSpin 0.8s linear infinite;
+}
+
+.accountDeactivationCompleteIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin: 6px auto 14px;
+  border-radius: 50%;
+  background: #EAF7EF;
+  color: #218A48;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+@keyframes accountDeactivationSpin {
+  to { transform: rotate(360deg); }
 }

@@ -1,8 +1,25 @@
 import React, { useState } from 'react';
-import { withdrawMe } from '../api/member';
+import { deactivateMyAccount, getAccountDeactivationInfo, type AccountDeactivationInfoDto } from '../api/member';
 import styles from './MyPage.module.css';
 
 type MenuKey = '입찰 내역'|'관심 목록'|'내 계좌'|'받은 후기'|'내 주소 관리'|'알림 설정'|'자주 묻는 질문'|'고객센터'|'이용약관'|'배송 조회'|'이용 가이드'|'내 등록 상품'|'내 문의'|'회원탈퇴';
+type AccountDeactivationStep = 'notice' | 'verify' | 'processing' | 'complete';
+
+const ACCOUNT_DEACTIVATION_CONFIRMATION_TEXT = '회원탈퇴';
+
+const ACCOUNT_DEACTIVATION_REASONS = [
+  { value: 'NO_LONGER_USED', label: '서비스를 더 이상 이용하지 않아요' },
+  { value: 'LOW_TRUST', label: '거래 신뢰도가 낮다고 느꼈어요' },
+  { value: 'MISSING_FEATURE', label: '필요한 기능이 부족해요' },
+  { value: 'PRIVACY_CONCERN', label: '개인정보가 걱정돼요' },
+  { value: 'OTHER', label: '기타' },
+] as const;
+
+const PASSWORD_ACCOUNT_DEACTIVATION_INFO: AccountDeactivationInfoDto = {
+  authenticationMethod: 'PASSWORD',
+  socialLogin: null,
+  confirmationText: null,
+};
 
 const MENU_ICONS: Record<MenuKey, React.ReactNode> = {
   '내 등록 상품': <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
@@ -60,24 +77,275 @@ interface Props {
 
 const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
   const [mannerTemp] = useState(36.8);
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [withdrawError, setWithdrawError] = useState('');
+  const [isAccountDeactivationModalOpen, setIsAccountDeactivationModalOpen] = useState(false);
+  const [accountDeactivationStep, setAccountDeactivationStep] = useState<AccountDeactivationStep>('notice');
+  const [isAccountDeactivationSubmitting, setIsAccountDeactivationSubmitting] = useState(false);
+  const [accountDeactivationError, setAccountDeactivationError] = useState('');
+  const [isAccountDeactivationInfoLoading, setIsAccountDeactivationInfoLoading] = useState(false);
+  const [accountDeactivationInfo, setAccountDeactivationInfo] = useState<AccountDeactivationInfoDto | null>(null);
+  const [hasAcceptedAccountDeactivationNotice, setHasAcceptedAccountDeactivationNotice] = useState(false);
+  const [accountDeactivationPassword, setAccountDeactivationPassword] = useState('');
+  const [accountDeactivationConfirmationText, setAccountDeactivationConfirmationText] = useState('');
+  const [accountDeactivationReasonCode, setAccountDeactivationReasonCode] = useState('');
+  const [accountDeactivationReason, setAccountDeactivationReason] = useState('');
 
-  const handleWithdraw = async () => {
-    setWithdrawLoading(true);
-    setWithdrawError('');
+  const isPasswordAccountDeactivation = accountDeactivationInfo?.authenticationMethod === 'PASSWORD';
+  const isSocialAccountDeactivation = accountDeactivationInfo?.authenticationMethod === 'SOCIAL_CONFIRMATION';
+  const accountDeactivationConfirmationLabel = accountDeactivationInfo?.confirmationText || ACCOUNT_DEACTIVATION_CONFIRMATION_TEXT;
+  const hasRequiredAccountDeactivationAuth = isPasswordAccountDeactivation
+    ? accountDeactivationPassword.trim().length > 0
+    : isSocialAccountDeactivation && accountDeactivationConfirmationText.trim().length > 0;
+  const canSubmitAccountDeactivation = Boolean(accountDeactivationReasonCode && hasRequiredAccountDeactivationAuth);
+
+  const openAccountDeactivationModal = () => {
+    setAccountDeactivationStep('notice');
+    setAccountDeactivationError('');
+    setHasAcceptedAccountDeactivationNotice(false);
+    setAccountDeactivationPassword('');
+    setAccountDeactivationConfirmationText('');
+    setAccountDeactivationReasonCode('');
+    setAccountDeactivationReason('');
+    setIsAccountDeactivationModalOpen(true);
+    setIsAccountDeactivationInfoLoading(false);
+    setAccountDeactivationInfo(null);
+  };
+
+  const closeAccountDeactivationModal = () => {
+    if (isAccountDeactivationSubmitting || accountDeactivationStep === 'processing') return;
+    setIsAccountDeactivationModalOpen(false);
+  };
+
+  const goToAccountDeactivationVerification = async () => {
+    if (!hasAcceptedAccountDeactivationNotice) {
+      setAccountDeactivationError('탈퇴 유의사항을 확인하고 동의해주세요.');
+      return;
+    }
+    setIsAccountDeactivationInfoLoading(true);
+    setAccountDeactivationError('');
 
     try {
-      await withdrawMe();
-      setShowWithdrawModal(false);
-      onLogout?.();
+      const info = await getAccountDeactivationInfo();
+      setAccountDeactivationInfo(info);
+      setAccountDeactivationPassword('');
+      setAccountDeactivationConfirmationText('');
+      setAccountDeactivationStep('verify');
     } catch (error) {
-      console.error('Failed to withdraw member', error);
-      setWithdrawError('회원탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      console.error('Failed to load account deactivation info', error);
+      const status = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+      if (status === 401 || status === 403) {
+        setAccountDeactivationError('로그인 상태를 확인할 수 없습니다. 다시 로그인해주세요.');
+        return;
+      }
+      setAccountDeactivationInfo(PASSWORD_ACCOUNT_DEACTIVATION_INFO);
+      setAccountDeactivationPassword('');
+      setAccountDeactivationConfirmationText('');
+      setAccountDeactivationStep('verify');
     } finally {
-      setWithdrawLoading(false);
+      setIsAccountDeactivationInfoLoading(false);
     }
+  };
+
+  const finishAccountDeactivation = () => {
+    onLogout?.();
+  };
+
+  const submitAccountDeactivation = async () => {
+    if (!accountDeactivationInfo) {
+      setAccountDeactivationError('계정 인증 방식을 먼저 확인해주세요.');
+      return;
+    }
+    if (!hasRequiredAccountDeactivationAuth) {
+      setAccountDeactivationError(isPasswordAccountDeactivation ? '현재 비밀번호를 입력해주세요.' : '확인 문구를 입력해주세요.');
+      return;
+    }
+    if (!accountDeactivationReasonCode) {
+      setAccountDeactivationError('탈퇴 사유를 선택해주세요.');
+      return;
+    }
+
+    setIsAccountDeactivationSubmitting(true);
+    setAccountDeactivationError('');
+    setAccountDeactivationStep('processing');
+
+    try {
+      await deactivateMyAccount({
+        password: isPasswordAccountDeactivation ? accountDeactivationPassword.trim() : undefined,
+        confirmationText: isSocialAccountDeactivation ? accountDeactivationConfirmationText.trim() : undefined,
+        reasonCode: accountDeactivationReasonCode,
+        reasonDetail: accountDeactivationReason.trim() || undefined,
+      });
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('bazar_logged_in');
+      localStorage.removeItem('bazar_user_name');
+      localStorage.removeItem('bazar_user_role');
+      setAccountDeactivationStep('complete');
+    } catch (error) {
+      console.error('Failed to deactivate account', error);
+      const message = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : '';
+      setAccountDeactivationError(message || '회원탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      setAccountDeactivationStep('verify');
+    } finally {
+      setIsAccountDeactivationSubmitting(false);
+    }
+  };
+
+  const renderAccountDeactivationModal = () => {
+    if (!isAccountDeactivationModalOpen) return null;
+
+    return (
+      <div className={styles.modalOverlay}>
+        <div className={`${styles.modal} ${styles.accountDeactivationModal}`}>
+          <div className={styles.accountDeactivationProgress}>
+            {['안내', '인증', '처리', '완료'].map((label, index) => {
+              const steps: AccountDeactivationStep[] = ['notice', 'verify', 'processing', 'complete'];
+              const currentIndex = steps.indexOf(accountDeactivationStep);
+              return (
+                <span key={label} className={`${styles.accountDeactivationStepDot} ${index <= currentIndex ? styles.accountDeactivationStepActive : ''}`}>
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+
+          {accountDeactivationStep === 'notice' && (
+            <>
+              <div className={styles.modalIcon}>
+                <svg width="32" height="32" fill="none" stroke="#E24B4A" strokeWidth="1.8" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <div className={styles.modalTitle}>회원탈퇴 전 확인해주세요</div>
+              <div className={styles.noticeList}>
+                <p>탈퇴 즉시 계정 이용이 중지됩니다.</p>
+                <p>거래 및 관리 이력은 정책과 관계 법령에 따라 보존됩니다.</p>
+                <p>예치금 잔액 또는 처리 대기 중인 지갑 요청이 있으면 탈퇴할 수 없습니다.</p>
+              </div>
+              <label className={styles.noticeCheckRow}>
+                <input
+                  type="checkbox"
+                  checked={hasAcceptedAccountDeactivationNotice}
+                  onChange={(event) => {
+                    setHasAcceptedAccountDeactivationNotice(event.target.checked);
+                    if (event.target.checked) setAccountDeactivationError('');
+                  }}
+                />
+                <span>위 유의사항을 확인했습니다.</span>
+              </label>
+              {accountDeactivationError && <div className={styles.accountDeactivationError}>{accountDeactivationError}</div>}
+              <div className={styles.modalBtns}>
+                <button className={styles.modalCancelBtn} onClick={closeAccountDeactivationModal}>취소</button>
+                <button className={styles.modalAccountDeactivationBtn} onClick={() => void goToAccountDeactivationVerification()} disabled={!hasAcceptedAccountDeactivationNotice || isAccountDeactivationInfoLoading}>
+                  {isAccountDeactivationInfoLoading ? '확인 중...' : '다음'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {accountDeactivationStep === 'verify' && (
+            <>
+              <div className={styles.modalTitle}>본인 인증 및 탈퇴 사유</div>
+              <p className={styles.accountDeactivationHelp}>
+                {isPasswordAccountDeactivation
+                  ? '현재 비밀번호로 본인 확인을 진행합니다.'
+                  : `${accountDeactivationInfo?.socialLogin ?? '소셜'} 계정입니다. 확인 문구를 정확히 입력해주세요.`}
+              </p>
+              {isPasswordAccountDeactivation && (
+                <div className={styles.accountDeactivationField}>
+                  <label>현재 비밀번호</label>
+                  <input
+                    type="password"
+                    value={accountDeactivationPassword}
+                    onChange={(event) => {
+                      setAccountDeactivationPassword(event.target.value);
+                      if (event.target.value.trim()) setAccountDeactivationError('');
+                    }}
+                    placeholder="현재 비밀번호 입력"
+                    autoComplete="current-password"
+                    disabled={isAccountDeactivationSubmitting}
+                  />
+                </div>
+              )}
+              {isSocialAccountDeactivation && (
+                <div className={styles.accountDeactivationField}>
+                  <label>소셜 계정 확인 문구</label>
+                  <input
+                    value={accountDeactivationConfirmationText}
+                    onChange={(event) => {
+                      setAccountDeactivationConfirmationText(event.target.value);
+                      if (event.target.value.trim()) setAccountDeactivationError('');
+                    }}
+                    placeholder={`${accountDeactivationConfirmationLabel} 입력`}
+                    disabled={isAccountDeactivationSubmitting}
+                  />
+                </div>
+              )}
+              <div className={styles.accountDeactivationField}>
+                <label>탈퇴 사유</label>
+                <select
+                  value={accountDeactivationReasonCode}
+                  onChange={(event) => {
+                    setAccountDeactivationReasonCode(event.target.value);
+                    if (event.target.value) setAccountDeactivationError('');
+                  }}
+                  disabled={isAccountDeactivationSubmitting}
+                >
+                  <option value="">사유를 선택해주세요</option>
+                  {ACCOUNT_DEACTIVATION_REASONS.map(reason => (
+                    <option key={reason.value} value={reason.value}>{reason.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.accountDeactivationField}>
+                <label>상세 의견</label>
+                <textarea
+                  value={accountDeactivationReason}
+                  onChange={(event) => setAccountDeactivationReason(event.target.value)}
+                  placeholder="남기고 싶은 의견이 있다면 입력해주세요. (선택)"
+                  disabled={isAccountDeactivationSubmitting}
+                />
+              </div>
+              {accountDeactivationError && <div className={styles.accountDeactivationError}>{accountDeactivationError}</div>}
+              <div className={styles.modalBtns}>
+                <button className={styles.modalCancelBtn} onClick={() => { setAccountDeactivationError(''); setAccountDeactivationStep('notice'); }} disabled={isAccountDeactivationSubmitting}>이전</button>
+                <button className={styles.modalAccountDeactivationBtn} onClick={() => void submitAccountDeactivation()} disabled={isAccountDeactivationSubmitting || !canSubmitAccountDeactivation}>
+                  탈퇴 처리
+                </button>
+              </div>
+            </>
+          )}
+
+          {accountDeactivationStep === 'processing' && (
+            <>
+              <div className={styles.accountDeactivationSpinner} />
+              <div className={styles.modalTitle}>탈퇴 처리 중입니다</div>
+              <p className={styles.modalDesc}>계정 상태를 변경하고 세션을 정리하고 있습니다.</p>
+              <button className={styles.modalAccountDeactivationBtn} disabled>
+                처리 중...
+              </button>
+            </>
+          )}
+
+          {accountDeactivationStep === 'complete' && (
+            <>
+              <div className={styles.accountDeactivationCompleteIcon}>✓</div>
+              <div className={styles.modalTitle}>회원탈퇴가 완료되었습니다</div>
+              <p className={styles.modalDesc}>
+                현재 세션은 만료되었습니다.<br />다시 이용하려면 새 계정으로 로그인해주세요.
+              </p>
+              <button className={styles.modalAccountDeactivationBtn} onClick={finishAccountDeactivation}>
+                로그인 화면으로
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -130,40 +398,13 @@ const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
       ))}
 
       <div className={styles.menuGroup}>
-        <button className={`${styles.menuItem} ${styles.withdrawItem}`} onClick={() => { setWithdrawError(''); setShowWithdrawModal(true); }}>
-          <span className={`${styles.menuIcon} ${styles.withdrawIcon}`}>{MENU_ICONS['회원탈퇴']}</span>
-          <span className={`${styles.menuLabel} ${styles.withdrawLabel}`}>회원탈퇴</span>
+        <button className={`${styles.menuItem} ${styles.accountDeactivationItem}`} onClick={openAccountDeactivationModal}>
+          <span className={`${styles.menuIcon} ${styles.accountDeactivationIcon}`}>{MENU_ICONS['회원탈퇴']}</span>
+          <span className={`${styles.menuLabel} ${styles.accountDeactivationLabel}`}>회원탈퇴</span>
         </button>
       </div>
 
-      {showWithdrawModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <div className={styles.modalIcon}>
-              <svg width="32" height="32" fill="none" stroke="#E24B4A" strokeWidth="1.8" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-            </div>
-            <div className={styles.modalTitle}>정말 탈퇴하시겠어요?</div>
-            <div className={styles.modalDesc}>
-              탈퇴 후 계정 이용이 중지되며<br />거래 및 관리 이력은 정책에 따라 보존됩니다.
-            </div>
-            {withdrawError && (
-              <div style={{ color: '#E24B4A', fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
-                {withdrawError}
-              </div>
-            )}
-            <div className={styles.modalBtns}>
-              <button className={styles.modalCancelBtn} onClick={() => setShowWithdrawModal(false)} disabled={withdrawLoading}>취소</button>
-              <button className={styles.modalWithdrawBtn} onClick={() => void handleWithdraw()} disabled={withdrawLoading}>
-                {withdrawLoading ? '처리 중...' : '탈퇴하기'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderAccountDeactivationModal()}
 
     </main>
   );

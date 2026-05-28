@@ -9,7 +9,7 @@ interface ApiResponse<T> {
 
 export type AdminMemberStatus = 'ACTIVE' | 'SUSPENDED' | 'PERMANENT' | 'WITHDRAWN';
 
-export interface AdminWithdrawnMemberDto {
+export interface AdminDeactivatedMemberDto {
   id: number;
   memberNo: string;
   name: string;
@@ -24,14 +24,16 @@ export interface AdminWithdrawnMemberDto {
   bidCount: number;
   reportCount: number;
   sanctionCount: number;
+  deactivationReasonCode: string | null;
+  deactivationReasonDetail: string | null;
   status: AdminMemberStatus;
 }
 
 const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
-export const getWithdrawnMembers = async () => {
-  const response = await customAxios.get<ApiResponse<AdminWithdrawnMemberDto[]>>(
-    '/admin/members/withdrawn',
+export const getDeactivatedMembers = async () => {
+  const response = await customAxios.get<ApiResponse<AdminDeactivatedMemberDto[]>>(
+    '/admin/members/deactivated',
   );
   return unwrap(response);
 };

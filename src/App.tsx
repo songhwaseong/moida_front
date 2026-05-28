@@ -224,6 +224,9 @@ const App: React.FC = () => {
     localStorage.removeItem('bazar_admin_idle_warned');
     localStorage.removeItem('bazar_admin_view');
     localStorage.removeItem('bazar_admin_login_at');
+    localStorage.removeItem('bazar_user_name');
+    localStorage.removeItem('bazar_user_role');
+    localStorage.removeItem('accessToken');
     setIsAdmin(false);
     setAdminViewMode('admin');
     setAuthScreen('login');
@@ -290,6 +293,7 @@ const App: React.FC = () => {
   const logout = () => {
     localStorage.removeItem('bazar_logged_in');
     localStorage.removeItem('bazar_user_name');
+    localStorage.removeItem('bazar_user_role');
     localStorage.removeItem('accessToken');
     setIsLoggedIn(false);
     setLoggedInUserName('');
