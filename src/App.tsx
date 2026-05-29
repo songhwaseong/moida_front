@@ -1,8 +1,9 @@
-import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import CategoryRow from './components/CategoryRow';
 import type { MyProduct } from './data/myProductStore';
 import type { MainTab, NavTab, AuctionItem, Product, Category } from './types';
 import { CATEGORIES } from './data/mockData';
+import { getUnreadNotificationCount } from './api/notifications';
 import PCLayout from './components/PCLayout';
 import { ToastProvider } from './components/Toast';
 import LeaveConfirmModal from './components/LeaveConfirmModal';
@@ -220,6 +221,7 @@ const App: React.FC = () => {
   });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // 폼 이탈 확인 상태
   const [formDirty, setFormDirty] = useState(false);
@@ -276,6 +278,44 @@ const App: React.FC = () => {
     }
   };
 
+  // 알림 탭에서 읽음 상태가 바뀐 뒤 상단 badge를 다시 맞춥니다.
+  const refreshNotificationCount = useCallback(async () => {
+    const hasToken = Boolean(localStorage.getItem('accessToken'));
+    if ((!isLoggedIn && !isAdmin) || !hasToken) {
+      return;
+    }
+
+    try {
+      const count = await getUnreadNotificationCount();
+      setNotificationCount(count);
+    } catch (error) {
+      console.error('Failed to load unread notification count', error);
+      setNotificationCount(0);
+    }
+  }, [isLoggedIn, isAdmin]);
+
+  useEffect(() => {
+    // 로그인 세션이 준비된 경우에만 unread count를 초기 조회합니다.
+    const hasToken = Boolean(localStorage.getItem('accessToken'));
+    if ((!isLoggedIn && !isAdmin) || !hasToken) return;
+
+    let ignore = false;
+
+    const loadNotificationCount = async () => {
+      try {
+        const count = await getUnreadNotificationCount();
+        if (!ignore) setNotificationCount(count);
+      } catch (error) {
+        console.error('Failed to load unread notification count', error);
+        if (!ignore) setNotificationCount(0);
+      }
+    };
+
+    void loadNotificationCount();
+
+    return () => { ignore = true; };
+  }, [isLoggedIn, isAdmin]);
+
   const loginAsAdmin = () => {
     localStorage.setItem('bazar_is_admin', 'true');
     localStorage.setItem('bazar_admin_view', 'admin');
@@ -295,6 +335,7 @@ const App: React.FC = () => {
     localStorage.removeItem('accessToken');
     setIsAdmin(false);
     setAdminViewMode('admin');
+    setNotificationCount(0);
     setAuthScreen('login');
   };
   const switchToNormal = () => { localStorage.setItem('bazar_admin_view', 'normal'); setAdminViewMode('normal'); };
@@ -373,6 +414,7 @@ const App: React.FC = () => {
     localStorage.removeItem('accessToken');
     setIsLoggedIn(false);
     setLoggedInUserName('');
+    setNotificationCount(0);
     setIsGuest(false); setAuthScreen('login');
   };
 
@@ -629,7 +671,7 @@ const App: React.FC = () => {
         : menuMap[screen.menu];
     }
     if (screen.type === 'navSearch') return <SearchPage onProductClick={handleProductClick} onAuctionClick={handleAuctionClick} initialQuery={searchQuery} onQueryClear={() => setSearchQuery('')} />;
-    if (screen.type === 'navNotification') return <NotificationPage />;
+    if (screen.type === 'navNotification') return <NotificationPage onUnreadCountChange={refreshNotificationCount} />;
     if (screen.type === 'navChat') return <ChatPage />;
     if (screen.type === 'navMy') return <MyPage onLogout={logout} onMenuClick={(menu) => setScreen({ type: 'myMenu', menu: menu as MyMenuKey })} onEditProfile={() => setScreen({ type: 'editProfile' })} />;
     return null;
@@ -646,7 +688,7 @@ const App: React.FC = () => {
         onNavTabChange={goNav}
         onSellClick={() => requireLogin(() => setScreen({ type: 'sellPage' }))}
         onSearch={handleSearch}
-        notificationCount={3}
+        notificationCount={notificationCount}
         isLoggedIn={isLoggedIn || isAdmin}
         loggedInUserName={isAdmin ? '관리자' : loggedInUserName}
         onAuthClick={isAdmin ? logoutAdmin : (isLoggedIn ? logout : () => { setIsGuest(false); setAuthScreen('login'); })}

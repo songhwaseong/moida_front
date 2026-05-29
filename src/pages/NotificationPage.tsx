@@ -1,69 +1,143 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  getNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  type NotificationCategory,
+  type NotificationDto,
+} from '../api/notifications';
 import styles from './NotificationPage.module.css';
 
-interface Noti {
-  id: number;
-  type: 'auction' | 'chat' | 'price' | 'system';
-  emoji: string;
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-}
-
-const NOTIFICATIONS: Noti[] = [
-  { id: 1, type: 'auction', emoji: '🔨', title: '입찰 경쟁 알림', body: '나이키 에어맥스 90에 새로운 입찰이 들어왔어요. 현재 45,000', time: '2분 전', read: false },
-  { id: 2, type: 'chat', emoji: '💬', title: '새 메시지', body: '구매자: 직거래 가능한가요? 강남역 근처면 좋겠어요', time: '15분 전', read: false },
-  { id: 3, type: 'price', emoji: '📉', title: '관심상품 가격 인하', body: 'LG 27인치 4K 모니터 280,000 → 240,000으로 내렸어요', time: '1시간 전', read: false },
-  { id: 4, type: 'auction', emoji: '⏰', title: '경매 마감 임박', body: '관심 등록한 소니 A7IV 카메라 경매가 30분 후 종료돼요', time: '2시간 전', read: true },
-  { id: 5, type: 'system', emoji: '🎉', title: '거래 완료', body: 'PS5 거래가 완료됐어요. 후기를 남겨주세요!', time: '어제', read: true },
-  { id: 6, type: 'chat', emoji: '💬', title: '새 메시지', body: '판매자: 네, 오늘 오후 6시에 만날 수 있어요', time: '어제', read: true },
-  { id: 7, type: 'system', emoji: '✅', title: '인증 완료', body: '계좌 인증이 완료됐어요. 이제 판매를 시작할 수 있어요', time: '3일 전', read: true },
-];
-
-const TYPE_COLOR: Record<Noti['type'], string> = {
-  auction: '#FDEEED',
-  chat: '#E1F5EE',
-  price: '#EAF3DE',
-  system: '#F0F1F4',
+const CATEGORY_META: Record<NotificationCategory, { label: string; icon: string; color: string }> = {
+  BID: { label: '입찰', icon: 'B', color: '#FDEEED' },
+  PRICE: { label: '가격', icon: 'P', color: '#EAF3DE' },
+  CHAT: { label: '채팅', icon: 'C', color: '#E1F5EE' },
+  TRADE: { label: '거래', icon: 'T', color: '#EEF2FF' },
+  MARKETING: { label: '혜택', icon: 'M', color: '#FFF3E0' },
+  SYSTEM: { label: '안내', icon: 'S', color: '#F0F1F4' },
 };
 
-const NotificationPage: React.FC = () => {
-  const [notis, setNotis] = useState(NOTIFICATIONS);
-  const unreadCount = notis.filter((n) => !n.read).length;
+interface Props {
+  onUnreadCountChange?: () => void;
+}
 
-  const markAll = () => setNotis((prev) => prev.map((n) => ({ ...n, read: true })));
-  const markOne = (id: number) => setNotis((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+const NotificationPage: React.FC<Props> = ({ onUnreadCountChange }) => {
+  const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+
+  useEffect(() => {
+    let ignore = false;
+
+    // 알림 탭은 서버에 저장된 기존 알림을 그대로 보여줍니다.
+    const loadNotifications = async () => {
+      try {
+        const data = await getNotifications();
+        if (!ignore) {
+          setNotifications(data);
+          setError('');
+        }
+      } catch (loadError) {
+        console.error('Failed to load notifications', loadError);
+        if (!ignore) {
+          setNotifications([]);
+          setError('알림을 불러오지 못했습니다.');
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+
+    void loadNotifications();
+
+    return () => { ignore = true; };
+  }, []);
+
+  const markOne = async (notificationId: number) => {
+    // 개별 읽음 처리는 optimistic update 후 실패하면 원래 상태로 복구합니다.
+    const target = notifications.find((notification) => notification.id === notificationId);
+    if (!target || target.read) return;
+
+    setNotifications((prev) => prev.map((notification) => (
+      notification.id === notificationId ? { ...notification, read: true } : notification
+    )));
+
+    try {
+      const updated = await markNotificationAsRead(notificationId);
+      setNotifications((prev) => prev.map((notification) => (
+        notification.id === notificationId ? updated : notification
+      )));
+      onUnreadCountChange?.();
+    } catch (markError) {
+      console.error('Failed to mark notification as read', markError);
+      setNotifications((prev) => prev.map((notification) => (
+        notification.id === notificationId ? target : notification
+      )));
+      setError('읽음 처리에 실패했습니다.');
+    }
+  };
+
+  const markAll = async () => {
+    // 전체 읽음도 먼저 화면을 갱신하고 서버 실패 시 이전 목록으로 되돌립니다.
+    const previous = notifications;
+    setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })));
+    setError('');
+
+    try {
+      await markAllNotificationsAsRead();
+      onUnreadCountChange?.();
+    } catch (markError) {
+      console.error('Failed to mark all notifications as read', markError);
+      setNotifications(previous);
+      setError('모두 읽음 처리에 실패했습니다.');
+    }
+  };
 
   return (
     <main className={styles.main}>
       <div className={styles.header}>
-        <h1 className={styles.title}>알림 {unreadCount > 0 && <span className={styles.badge}>{unreadCount}</span>}</h1>
-        {unreadCount > 0 && (
-          <button className={styles.markAll} onClick={markAll}>모두 읽음</button>
-        )}
+        <h1 className={styles.title}>알림 {unreadCount > 0 ? <span className={styles.badge}>{unreadCount}</span> : null}</h1>
+        {unreadCount > 0 ? (
+          <button className={styles.markAll} onClick={markAll} type="button">모두 읽음</button>
+        ) : null}
       </div>
 
+      {loading ? <p className={styles.stateText}>알림을 불러오는 중입니다.</p> : null}
+      {error ? <p className={styles.errorText}>{error}</p> : null}
+      {!loading && !error && notifications.length === 0 ? (
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>도착한 알림이 없습니다.</p>
+          <p className={styles.emptyDesc}>새 소식이 생기면 이곳에 모아둘게요.</p>
+        </div>
+      ) : null}
+
       <div className={styles.list}>
-        {notis.map((n) => (
-          <div
-            key={n.id}
-            className={`${styles.item} ${!n.read ? styles.unread : ''}`}
-            onClick={() => markOne(n.id)}
-          >
-            <div className={styles.iconBox} style={{ background: TYPE_COLOR[n.type] }}>
-              <span>{n.emoji}</span>
-            </div>
-            <div className={styles.content}>
-              <div className={styles.itemHeader}>
-                <span className={styles.itemTitle}>{n.title}</span>
-                <span className={styles.time}>{n.time}</span>
+        {notifications.map((notification) => {
+          const meta = CATEGORY_META[notification.category] ?? CATEGORY_META.SYSTEM;
+
+          return (
+            <button
+              key={notification.id}
+              className={`${styles.item} ${!notification.read ? styles.unread : ''}`}
+              onClick={() => markOne(notification.id)}
+              type="button"
+            >
+              <div className={styles.iconBox} style={{ background: meta.color }} aria-hidden="true">
+                <span>{meta.icon}</span>
               </div>
-              <p className={styles.body}>{n.body}</p>
-            </div>
-            {!n.read && <div className={styles.dot} />}
-          </div>
-        ))}
+              <div className={styles.content}>
+                <div className={styles.itemHeader}>
+                  <span className={styles.itemTitle}>{notification.title}</span>
+                  <span className={styles.time}>{notification.createdAt ?? ''}</span>
+                </div>
+                <p className={styles.body}>{notification.content}</p>
+                <span className={styles.categoryLabel}>{meta.label}</span>
+              </div>
+              {!notification.read ? <div className={styles.dot} /> : null}
+            </button>
+          );
+        })}
       </div>
     </main>
   );
