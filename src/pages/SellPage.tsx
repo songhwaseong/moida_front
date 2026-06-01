@@ -3,6 +3,7 @@ import { useToast } from '../components/ToastContext';
 import { CATEGORIES as HOME_CATEGORIES } from '../data/mockData';
 import ProductPreviewModal from '../components/ProductPreviewModal';
 import LeaveConfirmModal from '../components/LeaveConfirmModal';
+import { CARRIERS } from '../data/carriers';
 import styles from './SellPage.module.css';
 import customAxios from '../api/axiosInstance';
 
@@ -30,7 +31,6 @@ const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: 'B급', label: 'B급', desc: '사용감 있음' },
   { value: 'C급', label: 'C급', desc: '하자 있음' },
 ];
-
 const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>(1);
@@ -45,6 +45,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
   const [condition, setCondition] = useState<Condition | ''>('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [carrierCode, setCarrierCode] = useState('');
+  const [trackingNo, setTrackingNo] = useState('');
 
   // ── 경매 전용 필드 ──
   const [auctionStartPrice, setAuctionStartPrice] = useState('');
@@ -75,7 +77,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     images.length > 0 || title !== '' || category !== '' ||
     addonCategories.length > 0 || condition !== '' ||
     auctionStartPrice !== '' || buyNowPrice !== '' || minBidUnit !== '' ||
-    description !== '' || location !== '' || phone !== ''
+    description !== '' || location !== '' || carrierCode !== '' || trackingNo !== '' || phone !== ''
   );
 
   useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
@@ -211,6 +213,11 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
 
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
     if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';
+    if (!carrierCode || !trackingNo) {
+      e.shipment = '택배사와 송장번호를 입력해주세요';
+    } else if (!/^\d{10,14}$/.test(trackingNo)) {
+      e.shipment = '송장번호는 10~14자리 숫자로 입력해주세요';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -255,6 +262,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
         type: 'AUCTION',
         price: Number(auctionStartPrice.replace(/,/g, '')),
         location,
+        carrierCode: carrierCode || null,
+        trackingNo: trackingNo || null,
         image: images[mainImageIndex],
         images,
         mainImageIndex,
@@ -513,6 +522,31 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                 {errors.location && <p className={styles.fieldError}>{errors.location}</p>}
               </div>
 
+              <div className={styles.section}>
+                <label className={styles.sectionTitle}>배송 정보 <span className={styles.required}>*</span></label>
+                <p className={styles.sectionDesc}>택배사와 송장번호를 함께 등록해주세요.</p>
+                <div className={styles.shipmentGrid}>
+                  <select
+                    className={`${styles.input} ${errors.shipment ? styles.inputError : ''}`}
+                    value={carrierCode}
+                    onChange={e => { setCarrierCode(e.target.value); setErrors(p => ({ ...p, shipment: '' })); }}
+                  >
+                    <option value="">택배사 선택</option>
+                    {CARRIERS.map(carrier => (
+                      <option key={carrier.code} value={carrier.code}>{carrier.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    className={`${styles.input} ${errors.shipment ? styles.inputError : ''}`}
+                    placeholder="송장번호 10~14자리"
+                    value={trackingNo}
+                    onChange={e => { setTrackingNo(e.target.value.replace(/[^0-9]/g, '').slice(0, 14)); setErrors(p => ({ ...p, shipment: '' })); }}
+                    inputMode="numeric"
+                  />
+                </div>
+                {errors.shipment && <p className={styles.fieldError}>{errors.shipment}</p>}
+              </div>
+
               {/* 등록 요약 카드 */}
               <div className={styles.summaryCard}>
                 <p className={styles.summaryTitle}>등록 정보 확인</p>
@@ -533,6 +567,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                   <span className={styles.summaryValue}>{buyNowPrice ? `₩ ${buyNowPrice}` : '-'}</span>
                   <span className={styles.summaryLabel}>최소호가단위</span>
                   <span className={styles.summaryValue}>₩ {minBidUnit}</span>
+                  <span className={styles.summaryLabel}>배송 정보</span>
+                  <span className={styles.summaryValue}>{carrierCode && trackingNo ? `${CARRIERS.find(item => item.code === carrierCode)?.name ?? carrierCode} · ${trackingNo}` : '-'}</span>
                 </div>
               </div>
             </div>
@@ -612,6 +648,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                   <span className={styles.summaryValue}>
                     {`₩ ${auctionStartPrice} (시작가)`}
                   </span>
+                  <span className={styles.summaryLabel}>배송 정보</span>
+                  <span className={styles.summaryValue}>{carrierCode && trackingNo ? `${CARRIERS.find(item => item.code === carrierCode)?.name ?? carrierCode} · ${trackingNo}` : '-'}</span>
                 </div>
               </div>
             </div>

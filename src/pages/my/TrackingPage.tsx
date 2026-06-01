@@ -3,22 +3,11 @@ import { AxiosError } from 'axios';
 import styles from '../my/MySubPage.module.css';
 import tStyles from './TrackingPage.module.css';
 import { getTracking, type TrackingDto } from '../../api/tracking';
+import { CARRIERS } from '../../data/carriers';
 
 interface Props {
   onBack: () => void;
 }
-
-// code 는 스마트택배(t_code) 코드와 동일하게 맞춘다.
-const CARRIERS = [
-  { code: '04', name: 'CJ대한통운' },
-  { code: '06', name: '로젠택배' },
-  { code: '05', name: '한진택배' },
-  { code: '01', name: '우체국택배' },
-  { code: '08', name: '롯데택배' },
-  { code: '23', name: '경동택배' },
-  { code: '11', name: '일양로지스' },
-  { code: '12', name: 'EMS' },
-];
 
 type StepStatus = 'done' | 'active' | 'pending';
 

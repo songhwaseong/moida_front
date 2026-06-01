@@ -36,6 +36,8 @@ export interface ProductSummaryDto {
 export interface ProductDetailDto extends ProductSummaryDto {
   images: string[];
   description: string;
+  carrierCode?: string | null;
+  trackingNo?: string | null;
   seller: string;
   sellerTemp: number;
   sellerSales: number;
