@@ -684,7 +684,7 @@ const App: React.FC = () => {
       />
     );
     if (screen.type === 'sellerProfile') return <SellerProfilePage seller={screen.seller} onBack={goBack} onProductClick={handleProductClick} />;
-    if (screen.type === 'auctionDetail') return <AuctionDetailPage itemId={screen.id} onBack={goBack} isLoggedIn={isLoggedIn} onRequireLogin={() => requireLogin(() => { })} onSellerClick={(seller) => setScreen({ type: 'sellerProfile', seller })} />;
+    if (screen.type === 'auctionDetail') return <AuctionDetailPage itemId={screen.id} onBack={goBack} isLoggedIn={isLoggedIn || isAdmin} onRequireLogin={() => requireLogin(() => { })} onSellerClick={(seller) => setScreen({ type: 'sellerProfile', seller })} />;
     if (screen.type === 'productDetail') return (
       <ProductDetailPage
         productId={screen.id}
@@ -692,7 +692,7 @@ const App: React.FC = () => {
         onSellerClick={(seller) => setScreen({ type: 'sellerProfile', seller })}
         onAuctionClick={() => setScreen({ type: 'auctionDetail', id: Math.min(screen.id, 4) })}
         onChatClick={() => goNav('chat')}
-        isLoggedIn={isLoggedIn}
+        isLoggedIn={isLoggedIn || isAdmin}
         onRequireLogin={() => requireLogin(() => { })}
       />
     );
