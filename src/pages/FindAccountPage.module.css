@@ -118,3 +118,12 @@
 }
 .doneTitle { font-size: 22px; font-weight: 800; color: var(--text); }
 .doneSub { font-size: 14px; color: var(--muted); }
+
+@media (min-width: 768px) {
+  .page {
+    max-width: 420px;
+    margin: 40px auto;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  }
+}
