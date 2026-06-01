@@ -25,6 +25,7 @@ import WithdrawnMemberPage from './WithdrawnMemberPage';
 import AdminSettingsPage from './AdminSettingsPage';
 import AuctionManagePage from './AuctionManagePage';
 import { IDLE_OPTIONS, type IdleMinutes } from './adminSettingsOptions';
+import TrackingModal from '../../components/TrackingModal';
 import styles from './AdminPage.module.css';
 
 // ─── 관리자용 통합 상품 타입 ───────────────────────────────────────────
@@ -45,6 +46,8 @@ interface AdminProduct {
   status: ProductStatus;
   registeredAt: string;
   description: string;
+  carrierCode: string | null;
+  trackingNo: string | null;
 }
 
 // ─── 사이드바 메뉴 구조 ─────────────────────────────────────────────────
@@ -205,6 +208,8 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal }) => {
         status: dto.status,
         registeredAt: dto.registeredAt,
         description: dto.description ?? '',
+        carrierCode: dto.carrierCode,
+        trackingNo: dto.trackingNo,
       })));
     } catch {
       setLoadError('상품 목록을 불러오지 못했습니다.');
@@ -323,6 +328,9 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal }) => {
     handleStatusChange(approveTarget.product.id, newStatus);
     setApproveTarget(null);
   };
+
+  // 송장번호 클릭 시 띄우는 배송조회 모달. 클릭한 행의 carrierCode/trackingNo 만 들고 있으면 충분.
+  const [trackingTarget, setTrackingTarget] = useState<{ carrierCode: string | null; trackingNo: string | null } | null>(null);
 
   // 상품 상세 모달
   const [detailProduct, setDetailProduct] = useState<AdminProduct | null>(null);
@@ -514,11 +522,12 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal }) => {
             <colgroup>
               <col style={{ width: 100 }} />
               <col style={{ width: 240 }} />
-              <col style={{ width: 120 }} />
               <col style={{ width: 110 }} />
-              <col style={{ width: 110 }} />
-              <col style={{ width: 150 }} />
-              <col style={{ width: 110 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 100 }} />
             </colgroup>
             <thead>
               <tr>
@@ -527,6 +536,7 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal }) => {
                 <th>{t('admin.products.col.seller')}</th>
                 <th>{t('admin.products.col.price')}</th>
                 <th>{t('admin.products.col.registeredAt')}</th>
+                <th>{t('admin.products.col.tracking')}</th>
                 <th>{t('admin.products.col.manage')}</th>
                 <th>{t('admin.products.col.approve')}</th>
               </tr>
@@ -547,6 +557,24 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal }) => {
                   <td>{p.seller}</td>
                   <td>{p.price.toLocaleString()}</td>
                   <td>{p.registeredAt}</td>
+                  <td>
+                    {p.trackingNo ? (
+                      <button
+                        type="button"
+                        onClick={() => setTrackingTarget({ carrierCode: p.carrierCode, trackingNo: p.trackingNo })}
+                        style={{
+                          background: 'transparent', border: 'none', padding: 0,
+                          color: '#1E64FF', textDecoration: 'underline', cursor: 'pointer',
+                          fontFamily: 'monospace', fontSize: 12,
+                        }}
+                        title="배송 조회"
+                      >
+                        {p.trackingNo}
+                      </button>
+                    ) : (
+                      <span style={{ color: '#B0B3C0', fontSize: 12 }}>{t('admin.products.tracking.empty')}</span>
+                    )}
+                  </td>
                   <td>
                     <div className={styles.actionCell}>
                       <select
@@ -622,6 +650,15 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal }) => {
             style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #E0E0E0', background: currentPage === totalPages ? '#F5F5F5' : '#fff', color: currentPage === totalPages ? '#ccc' : '#333', cursor: currentPage === totalPages ? 'default' : 'pointer', fontSize: 13 }}
           >{t('admin.common.next')}</button>
         </div>
+      )}
+
+      {/* 송장번호 클릭 시 배송 조회 모달 — conditional mount 로 매번 fresh state 로 시작. */}
+      {trackingTarget && (
+        <TrackingModal
+          carrierCode={trackingTarget.carrierCode}
+          trackingNo={trackingTarget.trackingNo}
+          onClose={() => setTrackingTarget(null)}
+        />
       )}
     </>
   );

@@ -84,14 +84,19 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
 
   // 지갑 잔액을 다시 가져와 state 에 반영한다. 비로그인 상태에서는 호출하지 않는다.
   // 실패해도 사용자에게 별도 토스트는 띄우지 않고(잔액 부족 검증으로만 노출되므로) 콘솔에만 남긴다.
-  const refreshBalance = async () => {
-    if (!isLoggedIn) return;
+  // 호출자가 직후 잔액 비교를 해야 하는 경우(즉시낙찰 onClick 등)를 위해
+  // 가져온 최신 잔액을 반환한다. state 는 비동기 반영되어 같은 tick 에서는 stale 일 수 있으므로
+  // 호출자는 setState 값이 아닌 반환값으로 분기 판단을 한다.
+  const refreshBalance = async (): Promise<number | null> => {
+    if (!isLoggedIn) return null;
     setIsBalanceLoading(true);
     try {
       const wallet = await getWallet();
       setFetchedBalance(wallet.balance);
+      return wallet.balance;
     } catch (error) {
       console.error('Failed to load wallet balance', error);
+      return null;
     } finally {
       setIsBalanceLoading(false);
     }
@@ -458,9 +463,20 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
                 </button>
                 <button
                   className={styles.inlineInstantBtn}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!isLoggedIn) { onRequireLogin?.(); return; }
-                    void refreshBalance();
+                    if (!item.immediatePrice) return;
+                    // 최신 잔액으로 비교 (다른 탭에서 충전/출금했을 수도 있으므로 stale state 가 아닌
+                    // refreshBalance 의 반환값을 기준으로 한다).
+                    const latest = await refreshBalance();
+                    const balance = latest ?? userBalance;
+                    if (balance < item.immediatePrice) {
+                      showToast(
+                        `잔액이 부족해요. ${(item.immediatePrice - balance).toLocaleString()}원 더 필요해요`,
+                        'error',
+                      );
+                      return;
+                    }
                     setShowInstantModal(true);
                   }}
                   disabled={isEnded || !item.immediatePrice}

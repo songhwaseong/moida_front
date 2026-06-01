@@ -28,6 +28,9 @@ export interface AdminProductDto {
   status: AdminProductStatus;
   registeredAt: string;
   description: string | null;
+  // 관리자 테이블의 송장번호 컬럼/배송조회 모달에 사용. 등록 시 입력값이 없으면 null.
+  carrierCode: string | null;
+  trackingNo: string | null;
 }
 
 // 상세 조회 응답. 목록 DTO에 더해 등록된 모든 이미지(images)를 포함한다.
