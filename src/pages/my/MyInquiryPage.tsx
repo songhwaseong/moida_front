@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import styles from './MySubPage.module.css';
-import { useInquiries, type InquiryRecord, type InquiryKind } from '../../data/inquiries';
+import { getMyInquiries, type MyInquiryView } from '../../api/inquiries';
 
 type StatusTab = '전체' | '답변대기' | '답변완료';
 
-const KIND_LABEL: Record<InquiryKind, string> = { product: '경매예정', auction: '경매' };
+const KIND_LABEL: Record<MyInquiryView['kind'], string> = { product: '경매예정', auction: '경매' };
 
 interface Props {
   onBack: () => void;
@@ -13,26 +13,48 @@ interface Props {
 }
 
 const MyInquiryPage: React.FC<Props> = ({ onBack, onProductClick, onAuctionClick }) => {
-  const all = useInquiries();
   const [tab, setTab] = useState<StatusTab>('전체');
+  const [items, setItems] = useState<MyInquiryView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const mine = useMemo(() => all.filter(i => i.user === '나'), [all]);
-  const pending = mine.filter(i => !i.answer).length;
-  const done = mine.length - pending;
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getMyInquiries();
+        if (mounted) setItems(data);
+      } catch (err) {
+        console.error('Failed to load my inquiries', err);
+        if (mounted) setError('내 문의를 불러오지 못했어요.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => { mounted = false; };
+  }, []);
+
+  const pending = items.filter(i => !i.answer).length;
+  const done = items.length - pending;
 
   const filtered = useMemo(() => {
-    if (tab === '답변대기') return mine.filter(i => !i.answer);
-    if (tab === '답변완료') return mine.filter(i => i.answer);
-    return mine;
-  }, [mine, tab]);
+    if (tab === '답변대기') return items.filter(i => !i.answer);
+    if (tab === '답변완료') return items.filter(i => i.answer);
+    return items;
+  }, [items, tab]);
 
-  const handleItemClick = (rec: InquiryRecord) => {
+  const handleItemClick = (rec: MyInquiryView) => {
     if (rec.kind === 'auction') onAuctionClick?.(rec.itemId);
     else onProductClick?.(rec.itemId);
   };
 
   const TABS: { key: StatusTab; label: string; count?: number }[] = [
-    { key: '전체', label: '전체', count: mine.length },
+    { key: '전체', label: '전체', count: items.length },
     { key: '답변대기', label: '답변대기', count: pending },
     { key: '답변완료', label: '답변완료', count: done },
   ];
@@ -65,7 +87,16 @@ const MyInquiryPage: React.FC<Props> = ({ onBack, onProductClick, onAuctionClick
       </div>
 
       <div className={styles.list} style={{ paddingBottom: 24 }}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className={styles.empty}>
+            <p className={styles.emptyText}>불러오는 중...</p>
+          </div>
+        ) : error ? (
+          <div className={styles.empty}>
+            <p style={{ fontSize: 40 }}>!</p>
+            <p className={styles.emptyText}>{error}</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className={styles.empty}>
             <p style={{ fontSize: 40 }}>💬</p>
             <p className={styles.emptyText}>{tab === '전체' ? '등록한 문의가 없어요' : `${tab} 내역이 없어요`}</p>
@@ -84,7 +115,6 @@ const MyInquiryPage: React.FC<Props> = ({ onBack, onProductClick, onAuctionClick
                 overflow: 'hidden',
               }}
             >
-              {/* 상단: 상품 정보 (클릭 가능) */}
               <button
                 onClick={() => handleItemClick(q)}
                 style={{
@@ -125,17 +155,15 @@ const MyInquiryPage: React.FC<Props> = ({ onBack, onProductClick, onAuctionClick
                 </span>
               </button>
 
-              {/* 질문 */}
               <div style={{ padding: '14px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, background: '#1A1A2E', color: '#fff', fontSize: 11, fontWeight: 800 }}>Q</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>나</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{q.user}</span>
                   <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{q.date}</span>
                 </div>
                 <p style={{ fontSize: 13.5, lineHeight: 1.7, color: 'var(--text)', whiteSpace: 'pre-line', margin: 0 }}>{q.question}</p>
               </div>
 
-              {/* 답변 */}
               {q.answer && (
                 <div style={{ padding: '14px 16px', background: '#FAFAFB', borderTop: '1px dashed var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>

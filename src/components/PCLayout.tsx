@@ -192,7 +192,6 @@ const PCLayout: React.FC<Props> = ({
                     {/* 마이페이지 메뉴 그룹들을 슬라이드 다운 패널 형태로 노출 */}
                     {MY_MENU_GROUPS.map(group => (
                       <div key={group.title} className={styles.dropdownGroup}>
-                        <p className={styles.dropdownGroupTitle}>{group.title}</p>
                         {group.items.map(item => (
                           <button
                             key={item}

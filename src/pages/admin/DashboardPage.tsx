@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
-import { SANCTIONS } from '../../data/adminData';
-import { MEMBERS } from '../../data/memberData';
-import { PRODUCTS, AUCTION_ITEMS } from '../../data/mockData';
+import React, { useEffect, useMemo, useState } from 'react';
+import { getAdminMembers, type AdminMemberDto } from '../../api/adminMembers';
+import { getAdminProducts, type AdminProductDto } from '../../api/adminProducts';
+import { getAdminAuctions, type AdminAuctionDto } from '../../api/adminAuctions';
+import { getAdminSanctions, sanctionEnumToLabel, type AdminSanctionDto, type SanctionTypeLabel } from '../../api/adminSanctions';
 import styles from './DashboardPage.module.css';
 
 interface Props {
@@ -13,18 +14,57 @@ const CardIcon = ({ color, children }: { color: string; children: React.ReactNod
 );
 
 const DashboardPage: React.FC<Props> = ({ totalProducts }) => {
-  const stats = useMemo(() => {
-    const activeMembers   = MEMBERS.filter(m => m.status === 'active').length;
-    const suspendedMembers = MEMBERS.filter(m => m.status === 'suspended' || m.status === 'permanent').length;
-    const withdrawnMembers = MEMBERS.filter(m => m.status === 'withdrawn').length;
-    const totalSanctions  = SANCTIONS.length;
-    const wonCount    = AUCTION_ITEMS.filter(a => !a.isLive && a.id % 3 !== 0).length;
-    const failedCount = AUCTION_ITEMS.filter(a => !a.isLive && a.id % 3 === 0).length;
+  // 회원/상품/경매/제재 4개 API 를 Promise.all 로 병렬 로드한다.
+  const [members, setMembers] = useState<AdminMemberDto[]>([]);
+  const [products, setProducts] = useState<AdminProductDto[]>([]);
+  const [auctions, setAuctions] = useState<AdminAuctionDto[]>([]);
+  const [sanctions, setSanctions] = useState<AdminSanctionDto[]>([]);
+  const [, setLoading] = useState(true);
 
-    const recentProducts = PRODUCTS.filter(p => p.timeAgo.includes('분 전') || p.timeAgo.includes('시간 전'));
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [m, p, a, s] = await Promise.all([
+          getAdminMembers().catch(() => [] as AdminMemberDto[]),
+          getAdminProducts().catch(() => [] as AdminProductDto[]),
+          getAdminAuctions().catch(() => [] as AdminAuctionDto[]),
+          getAdminSanctions().catch(() => [] as AdminSanctionDto[]),
+        ]);
+        if (cancelled) return;
+        setMembers(m);
+        setProducts(p);
+        setAuctions(a);
+        setSanctions(s);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const stats = useMemo(() => {
+    const activeMembers    = members.filter(m => m.status === 'active').length;
+    const suspendedMembers = members.filter(m => m.status === 'suspended' || m.status === 'permanent').length;
+    const withdrawnMembers = members.filter(m => m.status === 'withdrawn').length;
+
+    const tradeProducts   = products.filter(p => p.type === '중고거래').length;
+    const auctionProducts = products.filter(p => p.type === '경매').length;
+
+    // 낙찰/유찰 — 경매 status 기준
+    const wonCount    = auctions.filter(a => a.status === 'SUCCESS').length;
+    const failedCount = auctions.filter(a => a.status === 'FAILED').length;
+
+    // 최근 등록 상품: 관리자 목록 API 가 최신순으로 내려주므로 첫 항목이 가장 최근.
+    // "최근 N건" 은 등록일이 오늘인 항목 수로 보수적으로 계산.
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '.'); // yyyy.MM.dd
+    const recentProductCount = products.filter(p => p.registeredAt === today).length;
+    const recentProductName  = products[0]?.name ?? '-';
+
+    const totalSanctions = sanctions.length;
 
     return {
-      totalMembers: MEMBERS.length,
+      totalMembers: members.length,
       activeMembers,
       suspendedMembers,
       withdrawnMembers,
@@ -32,26 +72,23 @@ const DashboardPage: React.FC<Props> = ({ totalProducts }) => {
       wonCount,
       failedCount,
       totalProducts,
-      tradeProducts: PRODUCTS.length,
-      auctionProducts: AUCTION_ITEMS.length,
-      recentProductCount: recentProducts.length,
-      recentProductName: recentProducts[0]?.name ?? '-',
+      tradeProducts,
+      auctionProducts,
+      recentProductCount,
+      recentProductName,
     };
-  }, [totalProducts]);
+  }, [members, products, auctions, sanctions, totalProducts]);
 
-  const wonItems    = AUCTION_ITEMS.filter(a => !a.isLive && a.id % 3 !== 0).slice(0, 5);
-  const failedItems = AUCTION_ITEMS.filter(a => !a.isLive && a.id % 3 === 0).slice(0, 5);
+  // 최근 낙찰/유찰 패널 (각 5개)
+  const wonItems    = useMemo(() => auctions.filter(a => a.status === 'SUCCESS').slice(0, 5), [auctions]);
+  const failedItems = useMemo(() => auctions.filter(a => a.status === 'FAILED').slice(0, 5), [auctions]);
 
-  const recentSanctions = SANCTIONS.slice().sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt)
-  ).slice(0, 3);
+  // 최근 제재 내역 — 백엔드 응답이 이미 최신순이므로 앞에서 3개만 사용.
+  const recentSanctions = useMemo(() => sanctions.slice(0, 3), [sanctions]);
 
-  const sanctionTypeLabel = (type: string) => {
-    if (type === 'warning')    return '경고';
-    if (type === 'suspend_7')  return '7일 정지';
-    if (type === 'suspend_30') return '30일 정지';
-    return '영구 정지';
-  };
+  const sanctionTypeLabel = (type: SanctionTypeLabel) => ({
+    warning: '경고', suspend_7: '7일 정지', suspend_30: '30일 정지', permanent: '영구 정지',
+  }[type]);
 
   return (
     <div className={styles.root}>
@@ -154,9 +191,12 @@ const DashboardPage: React.FC<Props> = ({ totalProducts }) => {
               <div className={styles.emptyMsg}>낙찰 내역이 없습니다.</div>
             ) : wonItems.map(a => (
               <div key={a.id} className={styles.auctionRow}>
-                <img src={a.image} alt={a.name} className={styles.auctionThumb} />
+                {/* 관리자 경매 응답에 thumbnail 이 없어 카테고리 이니셜로 대체 표시 */}
+                <div className={styles.auctionThumb} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F5F8', color: '#8B8FA8', fontSize: 11, fontWeight: 700 }}>
+                  {a.category?.slice(0, 2) ?? '경매'}
+                </div>
                 <div className={styles.auctionInfo}>
-                  <div className={styles.auctionName}>{a.name}</div>
+                  <div className={styles.auctionName}>{a.productName}</div>
                   <div className={styles.auctionMeta}>{a.category} · 입찰 {a.bidCount}회</div>
                 </div>
                 <div className={styles.auctionPrice}>{a.currentPrice.toLocaleString()}원</div>
@@ -176,9 +216,11 @@ const DashboardPage: React.FC<Props> = ({ totalProducts }) => {
               <div className={styles.emptyMsg}>유찰 내역이 없습니다.</div>
             ) : failedItems.map(a => (
               <div key={a.id} className={styles.auctionRow}>
-                <img src={a.image} alt={a.name} className={styles.auctionThumb} />
+                <div className={styles.auctionThumb} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F5F8', color: '#8B8FA8', fontSize: 11, fontWeight: 700 }}>
+                  {a.category?.slice(0, 2) ?? '경매'}
+                </div>
                 <div className={styles.auctionInfo}>
-                  <div className={styles.auctionName}>{a.name}</div>
+                  <div className={styles.auctionName}>{a.productName}</div>
                   <div className={styles.auctionMeta}>{a.category} · 입찰 {a.bidCount}회</div>
                 </div>
                 <div className={styles.auctionPriceFailed}>{a.currentPrice.toLocaleString()}원</div>
@@ -187,13 +229,15 @@ const DashboardPage: React.FC<Props> = ({ totalProducts }) => {
           </div>
         </div>
 
-        {/* 최근 제재 */}
+        {/* 최근 제재 — 백엔드 API 없음, mock 유지 */}
         <div className={styles.panel}>
           <div className={styles.panelHeader}>
             <span className={styles.panelTitle}>최근 제재 내역</span>
           </div>
           <div className={styles.panelBody}>
-            {recentSanctions.map(s => (
+            {recentSanctions.length === 0 ? (
+              <div className={styles.emptyMsg}>제재 내역이 없습니다.</div>
+            ) : recentSanctions.map(s => (
               <div key={s.id} className={styles.sanctionRow}>
                 <div className={styles.sanctionIcon}>
                   <svg width="16" height="16" fill="none" stroke="#A855F7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -203,7 +247,7 @@ const DashboardPage: React.FC<Props> = ({ totalProducts }) => {
                 <div className={styles.sanctionBody}>
                   <div className={styles.sanctionName}>
                     {s.memberName}
-                    <span className={styles.sanctionType}>{sanctionTypeLabel(s.type)}</span>
+                    <span className={styles.sanctionType}>{sanctionTypeLabel(sanctionEnumToLabel(s.type))}</span>
                   </div>
                   <div className={styles.sanctionReason}>{s.reason}</div>
                   <div className={styles.sanctionDate}>{s.createdAt}</div>

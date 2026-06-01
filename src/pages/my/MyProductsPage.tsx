@@ -1,62 +1,95 @@
-import React, { useState } from 'react';
-import { myProductStore, deleteMyProduct, updateMyProduct } from '../../data/myProductStore';
+import React, { useEffect, useMemo, useState } from 'react';
+import { getMyProducts, type ProductSummaryDto } from '../../api/products';
 import type { MyProduct } from '../../data/myProductStore';
 import styles from './MySubPage.module.css';
 import editStyles from './MyProductsPage.module.css';
-import LeaveConfirmModal from '../../components/LeaveConfirmModal';
-import { useToast } from '../../components/ToastContext';
 
-const TABS = ['전체', '경매예정', '승인요청중', '경매중', '낙찰', '유찰', '숨김'];
+const TABS = ['전체', '경매예정', '승인요청중', '경매중', '낙찰', '유찰', '숨김'] as const;
+
+type Tab = typeof TABS[number];
+type ProductStatusLabel = Exclude<Tab, '전체'>;
 
 interface Props {
   onBack: () => void;
   onEdit: (product: MyProduct) => void;
 }
 
+const STATUS_LABELS: Record<NonNullable<ProductSummaryDto['status']>, ProductStatusLabel | '삭제'> = {
+  SCHEDULED: '경매예정',
+  PENDING: '승인요청중',
+  LIVE: '경매중',
+  SOLD: '낙찰',
+  FAILED: '유찰',
+  HIDDEN: '숨김',
+  DELETED: '삭제',
+};
+
+const formatPrice = (value?: number | null) => value == null ? '—' : `${value.toLocaleString()}원`;
+
+const toStatusLabel = (item: ProductSummaryDto): ProductStatusLabel => {
+  if (item.status && STATUS_LABELS[item.status] !== '삭제') {
+    return STATUS_LABELS[item.status] as ProductStatusLabel;
+  }
+  if (item.isLive) return '경매중';
+  return '경매예정';
+};
+
+const toEditableProduct = (item: ProductSummaryDto): MyProduct => ({
+  id: item.id,
+  images: [item.image].filter(Boolean),
+  mainImageIndex: 0,
+  title: item.name,
+  category: item.category,
+  condition: item.condition,
+  auctionStartPrice: String(item.price ?? item.currentPrice ?? ''),
+  minBidUnit: '',
+  tradeMethod: '',
+  description: '',
+  location: item.location,
+  auctionDate: item.auctionDate ?? '',
+  status: toStatusLabel(item),
+  price: item.price ?? item.currentPrice ?? 0,
+  timeAgo: item.timeAgo,
+});
+
 const MyProductsPage: React.FC<Props> = ({ onBack, onEdit }) => {
-  const { showToast } = useToast();
-  const [tab, setTab] = useState('전체');
-  const [, forceUpdate] = useState(0);
-  const [deleteTarget, setDeleteTarget] = useState<MyProduct | null>(null);
-  const [hideTarget, setHideTarget] = useState<MyProduct | null>(null);
-  const [approveTarget, setApproveTarget] = useState<MyProduct | null>(null);
+  const [tab, setTab] = useState<Tab>('전체');
+  const [items, setItems] = useState<ProductSummaryDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const items = tab === '전체'
-    ? myProductStore
-    : myProductStore.filter(p => p.status === tab);
+  useEffect(() => {
+    let mounted = true;
 
-  const statusColor = (s: MyProduct['status']) => {
-    if (s === '경매예정') return styles.statusOn;
-    if (s === '승인요청중') return styles.statusApproving;
-    if (s === '경매중') return styles.statusAuctioning;
-    if (s === '낙찰') return styles.statusDone;
-    if (s === '유찰') return styles.statusFailed;
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getMyProducts();
+        if (mounted) setItems(data);
+      } catch (err) {
+        console.error('Failed to load my products', err);
+        if (mounted) setError('내 등록 상품을 불러오지 못했어요.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => { mounted = false; };
+  }, []);
+
+  const filteredItems = useMemo(() => (
+    tab === '전체' ? items : items.filter(item => toStatusLabel(item) === tab)
+  ), [items, tab]);
+
+  const statusColor = (status: ProductStatusLabel) => {
+    if (status === '경매예정') return styles.statusOn;
+    if (status === '승인요청중') return styles.statusApproving;
+    if (status === '경매중') return styles.statusAuctioning;
+    if (status === '낙찰') return styles.statusDone;
+    if (status === '유찰') return styles.statusFailed;
     return styles.statusHidden;
-  };
-
-  const refresh = () => forceUpdate(n => n + 1);
-
-  const handleDelete = () => {
-    if (!deleteTarget) return;
-    deleteMyProduct(deleteTarget.id);
-    setDeleteTarget(null);
-    refresh();
-  };
-
-  const handleHide = () => {
-    if (!hideTarget) return;
-    updateMyProduct({ ...hideTarget, status: '숨김' });
-    setHideTarget(null);
-    refresh();
-    showToast('상품이 숨김 처리됐어요.', 'info');
-  };
-
-  const handleApprove = () => {
-    if (!approveTarget) return;
-    updateMyProduct({ ...approveTarget, status: '승인요청중' });
-    setApproveTarget(null);
-    refresh();
-    showToast('승인 요청이 완료됐어요. 검토 후 경매가 시작돼요.', 'success');
   };
 
   return (
@@ -78,69 +111,44 @@ const MyProductsPage: React.FC<Props> = ({ onBack, onEdit }) => {
       </div>
 
       <div className={styles.list}>
-        {items.length > 0 ? items.map(p => (
-          <div key={p.id} className={styles.tradeItem}>
-            <img src={p.images[p.mainImageIndex] || p.images[0]} alt={p.title} className={styles.tradeImg}/>
-            <div className={styles.tradeBody}>
-              <p className={styles.tradeName}>{p.title}</p>
-              <p className={styles.tradeMeta}>{p.location} · {p.condition} · {p.category}</p>
-              <p className={styles.tradePrice}>경매시작가 {p.auctionStartPrice || '—'}</p>
-            </div>
-            <div className={styles.tradeActions}>
-              <span className={`${styles.statusBadge} ${statusColor(p.status)}`}>{p.status}</span>
-              <div className={editStyles.btnRow}>
-                {(p.status === '숨김' || p.status === '유찰') && (
-                  <button className={editStyles.editBtn} onClick={() => onEdit(p)}>수정</button>
-                )}
-                {p.status === '경매예정' && (
-                  <>
-                    <button className={editStyles.hideBtn} onClick={() => setHideTarget(p)}>숨김</button>
-                    <button className={editStyles.approveBtn} onClick={() => setApproveTarget(p)}>승인요청</button>
-                  </>
-                )}
-                {p.status === '유찰' && (
-                  <button className={editStyles.deleteBtn} onClick={() => setDeleteTarget(p)}>삭제</button>
+        {loading && <div className={styles.empty}><p className={styles.emptyText}>불러오는 중...</p></div>}
+
+        {!loading && error && (
+          <div className={styles.empty}>
+            <p style={{ fontSize: 40 }}>!</p>
+            <p className={styles.emptyText}>{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && filteredItems.length > 0 && filteredItems.map(item => {
+          const status = toStatusLabel(item);
+          return (
+            <div key={item.id} className={styles.tradeItem}>
+              <img src={item.image} alt={item.name} className={styles.tradeImg}/>
+              <div className={styles.tradeBody}>
+                <p className={styles.tradeName}>{item.name}</p>
+                <p className={styles.tradeMeta}>{item.location} · {item.condition} · {item.category}</p>
+                <p className={styles.tradePrice}>경매시작가 {formatPrice(item.price)}</p>
+              </div>
+              <div className={styles.tradeActions}>
+                <span className={`${styles.statusBadge} ${statusColor(status)}`}>{status}</span>
+                {(status === '경매예정' || status === '유찰' || status === '숨김') && (
+                  <div className={editStyles.btnRow}>
+                    <button className={editStyles.editBtn} onClick={() => onEdit(toEditableProduct(item))}>수정</button>
+                  </div>
                 )}
               </div>
             </div>
-          </div>
-        )) : (
+          );
+        })}
+
+        {!loading && !error && filteredItems.length === 0 && (
           <div className={styles.empty}>
             <p style={{ fontSize: 40 }}>📦</p>
-            <p className={styles.emptyText}>등록된 상품이 없어요</p>
+            <p className={styles.emptyText}>{tab === '전체' ? '등록된 상품이 없어요' : `${tab} 상품이 없어요`}</p>
           </div>
         )}
       </div>
-
-      {deleteTarget && (
-        <LeaveConfirmModal
-          message={`'${deleteTarget.title}'\n상품을 삭제하시겠어요?`}
-          confirmLabel="삭제하기"
-          cancelLabel="취소"
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
-
-      {hideTarget && (
-        <LeaveConfirmModal
-          message={`'${hideTarget.title}'\n상품을 숨김 처리하시겠어요?`}
-          confirmLabel="숨김 처리"
-          cancelLabel="취소"
-          onConfirm={handleHide}
-          onCancel={() => setHideTarget(null)}
-        />
-      )}
-
-      {approveTarget && (
-        <LeaveConfirmModal
-          message={`'${approveTarget.title}'\n경매 승인을 요청하시겠어요?\n검토 후 경매가 시작돼요.`}
-          confirmLabel="승인 요청"
-          cancelLabel="취소"
-          onConfirm={handleApprove}
-          onCancel={() => setApproveTarget(null)}
-        />
-      )}
     </div>
   );
 };

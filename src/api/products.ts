@@ -25,6 +25,7 @@ export interface ProductSummaryDto {
   auctionDate?: string | null;
   category: string;
   type: 'AUCTION';
+  status?: 'SCHEDULED' | 'PENDING' | 'LIVE' | 'SOLD' | 'FAILED' | 'HIDDEN' | 'DELETED';
   auctionNo?: string | null;
   currentPrice?: number | null;
   bidCount?: number | null;
@@ -35,6 +36,8 @@ export interface ProductSummaryDto {
 export interface ProductDetailDto extends ProductSummaryDto {
   images: string[];
   description: string;
+  carrierCode?: string | null;
+  trackingNo?: string | null;
   seller: string;
   sellerTemp: number;
   sellerSales: number;
@@ -44,6 +47,10 @@ export interface ProductDetailDto extends ProductSummaryDto {
   minBidUnit?: number | null;
   endDate?: string | null;
   bidHistory?: BidHistory[];
+  // 결제 대기 흐름용 필드
+  auctionStatus?: 'READY' | 'LIVE' | 'AWAITING_PAYMENT' | 'SUCCESS' | 'FAILED' | 'CANCELED' | null;
+  paymentDeadline?: string | null;
+  isWinner?: boolean | null;
 }
 
 const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
@@ -85,6 +92,11 @@ export const getProducts = async (params?: {
 
 export const getProduct = async (productId: number) => {
   const response = await customAxios.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`);
+  return unwrap(response);
+};
+
+export const getMyProducts = async () => {
+  const response = await customAxios.get<ApiResponse<ProductSummaryDto[]>>('/products/me');
   return unwrap(response);
 };
 
@@ -152,4 +164,7 @@ export const toAuctionDetail = (item: ProductDetailDto): AuctionDetail => ({
   liked: item.liked,
   likeCount: item.likeCount,
   timeAgo: item.timeAgo,
+  auctionStatus: item.auctionStatus ?? null,
+  paymentDeadline: item.paymentDeadline ?? null,
+  isWinner: item.isWinner ?? false,
 });

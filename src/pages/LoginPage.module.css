@@ -76,24 +76,43 @@
   background: #fff;
 }
 
-.input:focus { border-color: #1565C0; }
-.inputError { border-color: var(--primary) !important; }
+.input:focus {
+  border-color: #1565C0;
+}
 
-.pwWrap { position: relative; }
-.pwWrap .input { padding-right: 64px; }
+.inputError {
+  border-color: var(--primary) !important;
+}
+
+.pwWrap {
+  position: relative;
+}
+
+.pwWrap .input {
+  padding-right: 64px;
+}
 
 .pwToggle {
   position: absolute;
-  right: 14px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  font-size: 12px;
   color: var(--muted);
   cursor: pointer;
-  font-family: 'Noto Sans KR', sans-serif;
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.pwToggle:hover {
+  color: var(--text);
+}
+
+input[type="password"]::-ms-reveal {
+  display: none;
 }
 
 .errorMsg {
@@ -119,8 +138,14 @@
   transition: opacity 0.2s;
 }
 
-.loginBtn:active { opacity: 0.85; }
-.loading { opacity: 0.7; cursor: not-allowed; }
+.loginBtn:active {
+  opacity: 0.85;
+}
+
+.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 
 .forgotPw {
   text-align: center;
@@ -174,11 +199,25 @@
   transition: opacity 0.15s;
 }
 
-.socialBtn:active { opacity: 0.85; }
+.socialBtn:active {
+  opacity: 0.85;
+}
 
-.kakao { background: #FEE500; color: #3C1E1E; }
-.naver { background: #03C75A; color: #fff; }
-.google { background: #d1d0d06b; color: #333; border: 1.5px solid var(--border); }
+.kakao {
+  background: #FEE500;
+  color: #3C1E1E;
+}
+
+.naver {
+  background: #03C75A;
+  color: #fff;
+}
+
+.google {
+  background: #d1d0d06b;
+  color: #333;
+  border: 1.5px solid var(--border);
+}
 
 .socialIcon {
   font-size: 18px;
@@ -209,7 +248,10 @@
   gap: 6px;
 }
 
-.signupText { font-size: 14px; color: var(--muted); }
+.signupText {
+  font-size: 14px;
+  color: var(--muted);
+}
 
 .signupLink {
   font-size: 14px;
@@ -221,8 +263,17 @@
   font-family: 'Noto Sans KR', sans-serif;
 }
 
-.findRow { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.findDivider { color: var(--border); font-size: 13px; }
+.findRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.findDivider {
+  color: var(--border);
+  font-size: 13px;
+}
 
 @media (min-width: 768px) {
   .page {
@@ -230,12 +281,13 @@
     justify-content: center;
     background: var(--bg);
   }
-  .page > * {
+
+  .page>* {
     width: 420px;
     background: #fff;
     border-radius: 16px;
     padding: 40px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -253,4 +305,11 @@
   margin-top: 4px;
   transition: color 0.15s;
 }
-.guestBtn:hover { color: var(--text); }
+
+.guestBtn:hover {
+  color: var(--text);
+}
+
+input[type="password"]::-ms-reveal {
+  display: none;
+}

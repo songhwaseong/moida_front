@@ -1,19 +1,77 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import s from './admin.module.css';
-import { useInquiries, setAnswer, type InquiryRecord, type InquiryKind } from '../../data/inquiries';
+import {
+  getAdminInquiries,
+  answerAdminInquiry,
+  removeAdminInquiryAnswer,
+  deleteAdminInquiry,
+} from '../../api/adminInquiries';
+import type { InquiryResponseDto } from '../../api/inquiries';
 
+type InquiryKind = 'product' | 'auction';
 type StatusFilter = '전체' | '미답변' | '답변완료';
 type KindFilter = '전체' | InquiryKind;
 
+interface InquiryItem {
+  id: number;
+  kind: InquiryKind;
+  itemId: number;
+  itemName: string;
+  itemImage?: string;
+  seller: string;
+  user: string;
+  date: string;
+  question: string;
+  answer: { user: string; date: string; text: string } | null;
+}
+
 const KIND_LABEL: Record<InquiryKind, string> = { product: '경매예정', auction: '경매' };
 
+// 백엔드 DTO → 화면에서 쓰기 좋은 형태로 변환.
+const toItem = (dto: InquiryResponseDto): InquiryItem => ({
+  id: dto.id,
+  kind: (dto.kind ?? 'product') as InquiryKind,
+  itemId: dto.productId,
+  itemName: dto.itemName,
+  itemImage: dto.itemImage ?? undefined,
+  seller: dto.seller,
+  user: dto.user,
+  date: dto.date,
+  question: dto.question,
+  answer: dto.answer
+    ? { user: dto.seller, date: dto.answerDate ?? '', text: dto.answer }
+    : null,
+});
+
 const InquiryProductPage: React.FC = () => {
-  const inquiries = useInquiries();
+  const [inquiries, setInquiries] = useState<InquiryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('전체');
   const [kindFilter, setKindFilter] = useState<KindFilter>('전체');
   const [keyword, setKeyword] = useState('');
-  const [target, setTarget] = useState<InquiryRecord | null>(null);
+  const [target, setTarget] = useState<InquiryItem | null>(null);
   const [answerText, setAnswerText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
+
+  // 목록 로드 (마운트 시, 답변/삭제 직후 새로고침에도 재사용)
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const list = await getAdminInquiries();
+      setInquiries(list.map(toItem));
+    } catch {
+      setLoadError('문의 목록을 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 페치, 정상 데이터 로딩 패턴
+  useEffect(() => { reload(); }, [reload]);
 
   const pendingCount = inquiries.filter(i => !i.answer).length;
   const doneCount = inquiries.length - pendingCount;
@@ -33,18 +91,56 @@ const InquiryProductPage: React.FC = () => {
     });
   }, [inquiries, statusFilter, kindFilter, keyword]);
 
-  const openAnswer = (rec: InquiryRecord) => {
+  const openAnswer = (rec: InquiryItem) => {
     setTarget(rec);
     setAnswerText(rec.answer?.text ?? '');
   };
 
-  const submitAnswer = () => {
+  // 답변 등록/수정. 서버 응답으로 항목만 갱신해 전체 재조회 비용을 줄인다.
+  const submitAnswer = async () => {
     if (!target) return;
     const text = answerText.trim();
     if (!text) return;
-    setAnswer(target.id, text);
-    setTarget(null);
-    setAnswerText('');
+    setSubmitting(true);
+    try {
+      const updated = await answerAdminInquiry(target.id, text);
+      const updatedItem = toItem(updated);
+      setInquiries(prev => prev.map(i => i.id === target.id ? updatedItem : i));
+      setTarget(null);
+      setAnswerText('');
+    } catch {
+      setAlertMsg('답변 저장에 실패했습니다.\n잠시 후 다시 시도해주세요.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 답변만 제거 (문의는 유지). 모달에서 "답변 삭제"로 사용 가능.
+  const removeAnswer = async () => {
+    if (!target || !target.answer) return;
+    if (!window.confirm('답변을 삭제하시겠어요?')) return;
+    setSubmitting(true);
+    try {
+      await removeAdminInquiryAnswer(target.id);
+      setInquiries(prev => prev.map(i => i.id === target.id ? { ...i, answer: null } : i));
+      setTarget(null);
+      setAnswerText('');
+    } catch {
+      setAlertMsg('답변 삭제에 실패했습니다.\n잠시 후 다시 시도해주세요.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 문의 자체 삭제. 카드에서 직접 호출.
+  const deleteInquiry = async (rec: InquiryItem) => {
+    if (!window.confirm(`'${rec.user}'님의 문의를 삭제하시겠어요?`)) return;
+    try {
+      await deleteAdminInquiry(rec.id);
+      setInquiries(prev => prev.filter(i => i.id !== rec.id));
+    } catch {
+      setAlertMsg('문의 삭제에 실패했습니다.\n잠시 후 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -112,8 +208,19 @@ const InquiryProductPage: React.FC = () => {
         />
       </div>
 
-      {/* 문의 목록 */}
-      {filtered.length === 0 ? (
+      {/* 로딩/에러/빈 상태 */}
+      {loading ? (
+        <div className={s.emptyText} style={{ padding: 40, background: '#fff', border: '1px solid #EDEEF2', borderRadius: 12, textAlign: 'center', color: '#8B8FA8', fontSize: 13 }}>
+          문의를 불러오는 중입니다…
+        </div>
+      ) : loadError ? (
+        <div className={s.emptyText} style={{ padding: 40, background: '#fff', border: '1px solid #EDEEF2', borderRadius: 12, textAlign: 'center', color: '#8B8FA8', fontSize: 13 }}>
+          {loadError}
+          <div style={{ marginTop: 12 }}>
+            <button onClick={reload} style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid #E0E0E0', background: '#fff', cursor: 'pointer', fontSize: 13 }}>다시 시도</button>
+          </div>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className={s.emptyText} style={{ padding: 40, background: '#fff', border: '1px solid #EDEEF2', borderRadius: 12, textAlign: 'center', color: '#8B8FA8', fontSize: 13 }}>
           조건에 맞는 문의가 없습니다.
         </div>
@@ -149,6 +256,9 @@ const InquiryProductPage: React.FC = () => {
                 <button className={`${s.actionBtn} ${!q.answer ? s.actionBtnPrimary : ''}`} onClick={() => openAnswer(q)}>
                   {q.answer ? '답변 수정' : '답변 작성'}
                 </button>
+                <button className={s.actionBtn} onClick={() => deleteInquiry(q)} title="문의 삭제">
+                  삭제
+                </button>
               </div>
 
               {/* 질문 */}
@@ -182,11 +292,11 @@ const InquiryProductPage: React.FC = () => {
 
       {/* 답변 모달 */}
       {target && (
-        <div className={s.overlay} onClick={() => setTarget(null)}>
+        <div className={s.overlay} onClick={() => !submitting && setTarget(null)}>
           <div className={s.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
             <div className={s.modalHeader}>
               <div className={s.modalTitle}>{target.answer ? '답변 수정' : '답변 작성'}</div>
-              <button className={s.modalClose} onClick={() => setTarget(null)}>✕</button>
+              <button className={s.modalClose} onClick={() => setTarget(null)} disabled={submitting}>✕</button>
             </div>
 
             <div style={{ background: '#FAFAFB', border: '1px solid #EDEEF2', borderRadius: 10, padding: 14, margin: '14px 0' }}>
@@ -206,6 +316,7 @@ const InquiryProductPage: React.FC = () => {
               onChange={e => setAnswerText(e.target.value)}
               placeholder="답변 내용을 입력해주세요"
               autoFocus
+              disabled={submitting}
               style={{
                 width: '100%', minHeight: 140, boxSizing: 'border-box',
                 border: '1px solid #E0E0E0', borderRadius: 10, padding: 12,
@@ -215,16 +326,33 @@ const InquiryProductPage: React.FC = () => {
             />
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
-              <button className={s.actionBtn} onClick={() => setTarget(null)}>취소</button>
+              {target.answer && (
+                <button className={s.actionBtn} onClick={removeAnswer} disabled={submitting} style={{ marginRight: 'auto', color: '#A32D2D' }}>
+                  답변 삭제
+                </button>
+              )}
+              <button className={s.actionBtn} onClick={() => setTarget(null)} disabled={submitting}>취소</button>
               <button
                 className={`${s.actionBtn} ${s.actionBtnPrimary}`}
                 onClick={submitAnswer}
-                disabled={!answerText.trim()}
-                style={!answerText.trim() ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                disabled={!answerText.trim() || submitting}
+                style={(!answerText.trim() || submitting) ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
               >
-                {target.answer ? '수정 완료' : '답변 등록'}
+                {submitting ? '저장 중…' : (target.answer ? '수정 완료' : '답변 등록')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 안내 모달 */}
+      {alertMsg && (
+        <div className={s.overlay} onClick={() => setAlertMsg(null)}>
+          <div className={s.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: 360, textAlign: 'center' }}>
+            <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#1A1A2E', whiteSpace: 'pre-line', margin: '20px 0' }}>
+              {alertMsg}
+            </div>
+            <button className={`${s.actionBtn} ${s.actionBtnPrimary}`} onClick={() => setAlertMsg(null)}>확인</button>
           </div>
         </div>
       )}

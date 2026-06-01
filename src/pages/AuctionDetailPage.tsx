@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getProduct, toAuctionDetail } from '../api/products';
 import { toggleLike } from '../api/likes';
-import { buyNowProduct, placeProductBid, type BidType } from '../api/bids';
+import { buyNowProduct, payForAuction, placeProductBid, type BidType } from '../api/bids';
 import { createProductInquiry, getProductInquiries, type InquiryView } from '../api/inquiries';
 import { getWallet } from '../api/wallet';
 import type { AuctionDetail } from '../types';
@@ -84,14 +84,19 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
 
   // 지갑 잔액을 다시 가져와 state 에 반영한다. 비로그인 상태에서는 호출하지 않는다.
   // 실패해도 사용자에게 별도 토스트는 띄우지 않고(잔액 부족 검증으로만 노출되므로) 콘솔에만 남긴다.
-  const refreshBalance = async () => {
-    if (!isLoggedIn) return;
+  // 호출자가 직후 잔액 비교를 해야 하는 경우(즉시낙찰 onClick 등)를 위해
+  // 가져온 최신 잔액을 반환한다. state 는 비동기 반영되어 같은 tick 에서는 stale 일 수 있으므로
+  // 호출자는 setState 값이 아닌 반환값으로 분기 판단을 한다.
+  const refreshBalance = async (): Promise<number | null> => {
+    if (!isLoggedIn) return null;
     setIsBalanceLoading(true);
     try {
       const wallet = await getWallet();
       setFetchedBalance(wallet.balance);
+      return wallet.balance;
     } catch (error) {
       console.error('Failed to load wallet balance', error);
+      return null;
     } finally {
       setIsBalanceLoading(false);
     }
@@ -217,6 +222,27 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
       showToast(getApiErrorMessage(error, '입찰 등록에 실패했습니다.'), 'error');
     } finally {
       setIsBidding(false);
+    }
+  };
+
+  // ── 결제 대기 흐름 ────────────────────────────────────────────
+  // 낙찰 후 잔액 부족으로 AWAITING_PAYMENT 상태인 경매에 대해 본인(낙찰자)이 결제 버튼을 눌렀을 때.
+  // 잔액 검증/차감/Settlement 생성은 백엔드(AuctionCompletionService)가 처리.
+  const [isPaying, setIsPaying] = useState(false);
+  const handlePayForWin = async () => {
+    if (!item || isPaying) return;
+    setIsPaying(true);
+    try {
+      await payForAuction(item.id);
+      showToast('결제가 완료되었습니다!', 'success');
+      // 결제 후 상태가 SUCCESS 로 바뀌므로 화면 갱신을 위해 다시 로드.
+      const refreshed = await getProduct(item.id);
+      setItem(toAuctionDetail(refreshed));
+      void refreshBalance();
+    } catch (error: unknown) {
+      showToast(getApiErrorMessage(error, '결제에 실패했습니다.'), 'error');
+    } finally {
+      setIsPaying(false);
     }
   };
 
@@ -392,6 +418,37 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
                 </div>
               )}
 
+              {/* 결제 대기 안내: 본인 낙찰 + AWAITING_PAYMENT 일 때만 노출 */}
+              {item.auctionStatus === 'AWAITING_PAYMENT' && item.isWinner && (
+                <div
+                  style={{
+                    marginTop: 8, padding: 12, borderRadius: 8,
+                    background: '#FFF7E6', border: '1px solid #FFD591',
+                    fontSize: 13, color: '#7A4A00',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                    낙찰되었습니다 — 결제 대기 중
+                  </div>
+                  <div>결제 기한: <b>{item.paymentDeadline}</b></div>
+                  <div style={{ marginTop: 2 }}>
+                    낙찰가 <b>{currentPrice.toLocaleString()}원</b> · 보유 잔액 {userBalance.toLocaleString()}원
+                  </div>
+                  <button
+                    className={styles.inlineInstantBtn}
+                    style={{ marginTop: 8, width: '100%' }}
+                    onClick={handlePayForWin}
+                    disabled={isPaying || userBalance < currentPrice}
+                  >
+                    {isPaying
+                      ? '결제 중…'
+                      : userBalance < currentPrice
+                        ? `잔액 부족 — ${(currentPrice - userBalance).toLocaleString()}원 충전 필요`
+                        : '결제하기'}
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <button
                   className={styles.inlineBidBtn}
@@ -406,9 +463,20 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
                 </button>
                 <button
                   className={styles.inlineInstantBtn}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!isLoggedIn) { onRequireLogin?.(); return; }
-                    void refreshBalance();
+                    if (!item.immediatePrice) return;
+                    // 최신 잔액으로 비교 (다른 탭에서 충전/출금했을 수도 있으므로 stale state 가 아닌
+                    // refreshBalance 의 반환값을 기준으로 한다).
+                    const latest = await refreshBalance();
+                    const balance = latest ?? userBalance;
+                    if (balance < item.immediatePrice) {
+                      showToast(
+                        `잔액이 부족해요. ${(item.immediatePrice - balance).toLocaleString()}원 더 필요해요`,
+                        'error',
+                      );
+                      return;
+                    }
                     setShowInstantModal(true);
                   }}
                   disabled={isEnded || !item.immediatePrice}

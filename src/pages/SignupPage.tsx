@@ -100,8 +100,9 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
         email: form.email,
         password: form.password,
       });
-      const { accessToken, name } = loginResponse.data.data;
+      const { accessToken, refreshToken, name } = loginResponse.data.data;
       localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       onSignup(name); // 성공 시에만 호출
     } catch (error: unknown) {
       const msg = getErrorMessage(error, '회원가입에 실패했어요');

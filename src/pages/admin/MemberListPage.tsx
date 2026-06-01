@@ -26,7 +26,7 @@ const MemberListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 5;
 
-  const currentRole = localStorage.getItem('bazar_user_role');
+  const currentRole = localStorage.getItem('moida_user_role');
 
   const handleRoleToggle = async (m: Member) => {
     if (!m.id) { alert('API 연동 후 사용 가능합니다'); return; }

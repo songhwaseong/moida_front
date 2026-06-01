@@ -40,6 +40,7 @@ const WishlistPage: React.FC<Props> = ({ onProductClick, onAuctionClick, onBack 
     let ignore = false;
     const loadLikedProducts = async () => {
       setIsLoading(true);
+      setLoadError('');
       try {
         const items = await getMyLikes();
         if (ignore) return;

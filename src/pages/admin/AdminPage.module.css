@@ -456,6 +456,20 @@
 }
 .approveBtn:hover { background: #D4EDDA; }
 
+/* 경매 시작(SCHEDULED → LIVE) 버튼. 의미를 시각적으로 구분하기 위해 파란 톤을 사용한다. */
+.startBtn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 8px;
+  background: #E3F0FF;
+  color: #1E6FE0;
+  border: 1px solid #B8D8FF;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.startBtn:hover { background: #CFE3FF; }
+
 .cancelBtn {
   font-size: 12px;
   font-weight: 700;
@@ -597,7 +611,10 @@
   box-sizing: border-box;
 }
 .detailEditSelect:focus { border-color: #E24B4A; }
-.detailScroll { flex: 1; overflow-y: auto; }
+/* 스크롤 기능은 유지하되 스크롤바는 숨긴다 (Firefox: scrollbar-width, IE: -ms-overflow-style) */
+.detailScroll { flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+/* 스크롤바 숨김 (Chrome/Safari/Edge) */
+.detailScroll::-webkit-scrollbar { display: none; }
 .detailImg {
   width: 100%; height: 260px; object-fit: cover; display: block; flex-shrink: 0;
 }

@@ -3,8 +3,10 @@ import { useToast } from '../components/ToastContext';
 import { CATEGORIES as HOME_CATEGORIES } from '../data/mockData';
 import ProductPreviewModal from '../components/ProductPreviewModal';
 import LeaveConfirmModal from '../components/LeaveConfirmModal';
+import { CARRIERS } from '../data/carriers';
 import styles from './SellPage.module.css';
 import customAxios from '../api/axiosInstance';
+import { getMyProfile } from '../api/member';
 
 interface Props {
   onBack: () => void;
@@ -30,7 +32,6 @@ const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: 'B급', label: 'B급', desc: '사용감 있음' },
   { value: 'C급', label: 'C급', desc: '하자 있음' },
 ];
-
 const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>(1);
@@ -45,6 +46,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
   const [condition, setCondition] = useState<Condition | ''>('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [carrierCode, setCarrierCode] = useState('');
+  const [trackingNo, setTrackingNo] = useState('');
 
   // ── 경매 전용 필드 ──
   const [auctionStartPrice, setAuctionStartPrice] = useState('');
@@ -54,6 +57,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
   // ── 인증 관련 ──
   const [phone, setPhone] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneFromProfile, setPhoneFromProfile] = useState(false);
   const [verifyCode, setVerifyCode] = useState('');
   const [inputCode, setInputCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -75,8 +79,17 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     images.length > 0 || title !== '' || category !== '' ||
     addonCategories.length > 0 || condition !== '' ||
     auctionStartPrice !== '' || buyNowPrice !== '' || minBidUnit !== '' ||
-    description !== '' || location !== '' || phone !== ''
+    description !== '' || location !== '' || carrierCode !== '' || trackingNo !== '' || phone !== ''
   );
+
+  useEffect(() => {
+    getMyProfile().then(data => {
+      if (data.phone) {
+        setPhone(data.phone);
+        setPhoneFromProfile(true);
+      }
+    }).catch(() => { });
+  }, []);
 
   useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
 
@@ -200,17 +213,22 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
 
   const validateStep2 = () => {
     const e: Record<string, string> = {};
-      // 경매 유효성
-      if (!auctionStartPrice.trim()) e.auctionStartPrice = '경매 시작가를 입력해주세요';
-      if (buyNowPrice.trim() && auctionStartPrice.trim()) {
-        const start = Number(auctionStartPrice.replace(/,/g, ''));
-        const buyNow = Number(buyNowPrice.replace(/,/g, ''));
-        if (buyNow <= start) e.buyNowPrice = '즉시낙찰가는 경매 시작가보다 높게 입력해주세요';
-      }
-      if (!minBidUnit.trim()) e.minBidUnit = '최소 호가 단위를 입력해주세요';
+    // 경매 유효성
+    if (!auctionStartPrice.trim()) e.auctionStartPrice = '경매 시작가를 입력해주세요';
+    if (buyNowPrice.trim() && auctionStartPrice.trim()) {
+      const start = Number(auctionStartPrice.replace(/,/g, ''));
+      const buyNow = Number(buyNowPrice.replace(/,/g, ''));
+      if (buyNow <= start) e.buyNowPrice = '즉시낙찰가는 경매 시작가보다 높게 입력해주세요';
+    }
+    if (!minBidUnit.trim()) e.minBidUnit = '최소 호가 단위를 입력해주세요';
 
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
     if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';
+    if (!carrierCode || !trackingNo) {
+      e.shipment = '택배사와 송장번호를 입력해주세요';
+    } else if (!/^\d{10,14}$/.test(trackingNo)) {
+      e.shipment = '송장번호는 10~14자리 숫자로 입력해주세요';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -255,6 +273,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
         type: 'AUCTION',
         price: Number(auctionStartPrice.replace(/,/g, '')),
         location,
+        carrierCode: carrierCode || null,
+        trackingNo: trackingNo || null,
         image: images[mainImageIndex],
         images,
         mainImageIndex,
@@ -436,54 +456,54 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
           {/* STEP 2: 경매 정보 */}
           {step === 2 && (
             <div className={styles.form}>
-                  {/* 경매 시작가 */}
-                  <div className={styles.section}>
-                    <label className={styles.sectionTitle}>경매 시작가 <span className={styles.required}>*</span></label>
-                    <div className={styles.priceWrap}>
-                      <span className={styles.pricePrefix}>₩</span>
-                      <input
-                        className={`${styles.input} ${styles.priceInput} ${errors.auctionStartPrice ? styles.inputError : ''}`}
-                        placeholder="시작가를 입력해주세요"
-                        value={auctionStartPrice}
-                        onChange={e => { setAuctionStartPrice(formatPrice(e.target.value)); setErrors(p => ({ ...p, auctionStartPrice: '' })); }}
-                        inputMode="numeric"
-                      />
-                    </div>
-                    {errors.auctionStartPrice && <p className={styles.fieldError}>{errors.auctionStartPrice}</p>}
-                  </div>
+              {/* 경매 시작가 */}
+              <div className={styles.section}>
+                <label className={styles.sectionTitle}>경매 시작가 <span className={styles.required}>*</span></label>
+                <div className={styles.priceWrap}>
+                  <span className={styles.pricePrefix}>₩</span>
+                  <input
+                    className={`${styles.input} ${styles.priceInput} ${errors.auctionStartPrice ? styles.inputError : ''}`}
+                    placeholder="시작가를 입력해주세요"
+                    value={auctionStartPrice}
+                    onChange={e => { setAuctionStartPrice(formatPrice(e.target.value)); setErrors(p => ({ ...p, auctionStartPrice: '' })); }}
+                    inputMode="numeric"
+                  />
+                </div>
+                {errors.auctionStartPrice && <p className={styles.fieldError}>{errors.auctionStartPrice}</p>}
+              </div>
 
-                  {/* 즉시낙찰가 */}
-                  <div className={styles.section}>
-                    <label className={styles.sectionTitle}>즉시낙찰가</label>
-                    <p className={styles.sectionDesc}>구매자가 바로 낙찰할 수 있는 가격이에요</p>
-                    <div className={styles.priceWrap}>
-                      <span className={styles.pricePrefix}>₩</span>
-                      <input
-                        className={`${styles.input} ${styles.priceInput} ${errors.buyNowPrice ? styles.inputError : ''}`}
-                        placeholder="즉시낙찰가 (선택)"
-                        value={buyNowPrice}
-                        onChange={e => { setBuyNowPrice(formatPrice(e.target.value)); setErrors(p => ({ ...p, buyNowPrice: '' })); }}
-                        inputMode="numeric"
-                      />
-                    </div>
-                    {errors.buyNowPrice && <p className={styles.fieldError}>{errors.buyNowPrice}</p>}
-                  </div>
+              {/* 즉시낙찰가 */}
+              <div className={styles.section}>
+                <label className={styles.sectionTitle}>즉시낙찰가</label>
+                <p className={styles.sectionDesc}>구매자가 바로 낙찰할 수 있는 가격이에요</p>
+                <div className={styles.priceWrap}>
+                  <span className={styles.pricePrefix}>₩</span>
+                  <input
+                    className={`${styles.input} ${styles.priceInput} ${errors.buyNowPrice ? styles.inputError : ''}`}
+                    placeholder="즉시낙찰가 (선택)"
+                    value={buyNowPrice}
+                    onChange={e => { setBuyNowPrice(formatPrice(e.target.value)); setErrors(p => ({ ...p, buyNowPrice: '' })); }}
+                    inputMode="numeric"
+                  />
+                </div>
+                {errors.buyNowPrice && <p className={styles.fieldError}>{errors.buyNowPrice}</p>}
+              </div>
 
-                  {/* 최소 호가 단위 */}
-                  <div className={styles.section}>
-                    <label className={styles.sectionTitle}>최소 호가 단위 <span className={styles.required}>*</span></label>
-                    <div className={styles.priceWrap}>
-                      <span className={styles.pricePrefix}>₩</span>
-                      <input
-                        className={`${styles.input} ${styles.priceInput} ${errors.minBidUnit ? styles.inputError : ''}`}
-                        placeholder="입찰 최소 단위를 입력해주세요"
-                        value={minBidUnit}
-                        onChange={e => { setMinBidUnit(formatPrice(e.target.value)); setErrors(p => ({ ...p, minBidUnit: '' })); }}
-                        inputMode="numeric"
-                      />
-                    </div>
-                    {errors.minBidUnit && <p className={styles.fieldError}>{errors.minBidUnit}</p>}
-                  </div>
+              {/* 최소 호가 단위 */}
+              <div className={styles.section}>
+                <label className={styles.sectionTitle}>최소 호가 단위 <span className={styles.required}>*</span></label>
+                <div className={styles.priceWrap}>
+                  <span className={styles.pricePrefix}>₩</span>
+                  <input
+                    className={`${styles.input} ${styles.priceInput} ${errors.minBidUnit ? styles.inputError : ''}`}
+                    placeholder="입찰 최소 단위를 입력해주세요"
+                    value={minBidUnit}
+                    onChange={e => { setMinBidUnit(formatPrice(e.target.value)); setErrors(p => ({ ...p, minBidUnit: '' })); }}
+                    inputMode="numeric"
+                  />
+                </div>
+                {errors.minBidUnit && <p className={styles.fieldError}>{errors.minBidUnit}</p>}
+              </div>
 
               {/* 상품 설명 */}
               <div className={styles.section}>
@@ -513,6 +533,31 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                 {errors.location && <p className={styles.fieldError}>{errors.location}</p>}
               </div>
 
+              <div className={styles.section}>
+                <label className={styles.sectionTitle}>배송 정보 <span className={styles.required}>*</span></label>
+                <p className={styles.sectionDesc}>택배사와 송장번호를 함께 등록해주세요.</p>
+                <div className={styles.shipmentGrid}>
+                  <select
+                    className={`${styles.input} ${errors.shipment ? styles.inputError : ''}`}
+                    value={carrierCode}
+                    onChange={e => { setCarrierCode(e.target.value); setErrors(p => ({ ...p, shipment: '' })); }}
+                  >
+                    <option value="">택배사 선택</option>
+                    {CARRIERS.map(carrier => (
+                      <option key={carrier.code} value={carrier.code}>{carrier.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    className={`${styles.input} ${errors.shipment ? styles.inputError : ''}`}
+                    placeholder="송장번호 10~14자리"
+                    value={trackingNo}
+                    onChange={e => { setTrackingNo(e.target.value.replace(/[^0-9]/g, '').slice(0, 14)); setErrors(p => ({ ...p, shipment: '' })); }}
+                    inputMode="numeric"
+                  />
+                </div>
+                {errors.shipment && <p className={styles.fieldError}>{errors.shipment}</p>}
+              </div>
+
               {/* 등록 요약 카드 */}
               <div className={styles.summaryCard}>
                 <p className={styles.summaryTitle}>등록 정보 확인</p>
@@ -533,6 +578,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                   <span className={styles.summaryValue}>{buyNowPrice ? `₩ ${buyNowPrice}` : '-'}</span>
                   <span className={styles.summaryLabel}>최소호가단위</span>
                   <span className={styles.summaryValue}>₩ {minBidUnit}</span>
+                  <span className={styles.summaryLabel}>배송 정보</span>
+                  <span className={styles.summaryValue}>{carrierCode && trackingNo ? `${CARRIERS.find(item => item.code === carrierCode)?.name ?? carrierCode} · ${trackingNo}` : '-'}</span>
                 </div>
               </div>
             </div>
@@ -546,11 +593,18 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                 <p className={styles.sectionDesc}>판매자 인증을 위해 휴대폰 번호가 필요해요</p>
                 <div className={styles.phoneRow}>
                   <input
-                    className={`${styles.input} ${styles.phoneInput} ${errors.phone ? styles.inputError : ''}`}
+                    className={`${styles.input} ${styles.phoneInput} ${phoneFromProfile ? styles.inputReadonly : ''} ${errors.phone ? styles.inputError : ''}`}
                     placeholder="010-0000-0000"
                     value={phone}
-                    onChange={e => { setPhone(e.target.value); setErrors(p => ({ ...p, phone: '', code: '' })); setPhoneVerified(false); setCodeSent(false); }}
+                    onChange={e => {
+                      if (phoneFromProfile) return;
+                      setPhone(e.target.value);
+                      setErrors(p => ({ ...p, phone: '', code: '' }));
+                      setPhoneVerified(false);
+                      setCodeSent(false);
+                    }}
                     inputMode="tel"
+                    readOnly={phoneFromProfile}
                     disabled={phoneVerified}
                   />
                   <button
@@ -612,6 +666,8 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                   <span className={styles.summaryValue}>
                     {`₩ ${auctionStartPrice} (시작가)`}
                   </span>
+                  <span className={styles.summaryLabel}>배송 정보</span>
+                  <span className={styles.summaryValue}>{carrierCode && trackingNo ? `${CARRIERS.find(item => item.code === carrierCode)?.name ?? carrierCode} · ${trackingNo}` : '-'}</span>
                 </div>
               </div>
             </div>

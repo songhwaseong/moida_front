@@ -6,6 +6,8 @@ import { CATEGORIES } from './data/mockData';
 import { getUnreadNotificationCount } from './api/notifications';
 import PCLayout from './components/PCLayout';
 import { ToastProvider } from './components/Toast';
+import NotificationSocketBridge from './components/NotificationSocketBridge';
+import { disconnectNotificationSocket } from './components/notificationSocket';
 import LeaveConfirmModal from './components/LeaveConfirmModal';
 import AlertModal from './components/AlertModal';
 import styles from './App.module.css';
@@ -39,11 +41,13 @@ const FaqPage = lazy(() => import('./pages/my/FaqPage'));
 const CustomerServicePage = lazy(() => import('./pages/my/CustomerServicePage'));
 const TermsPage = lazy(() => import('./pages/my/TermsPage'));
 const EditProfilePage = lazy(() => import('./pages/my/EditProfilePage'));
+const ChangePasswordPage = lazy(() => import('./pages/my/ChangePasswordPage'));
 const MyWalletPage = lazy(() => import('./pages/my/MyWalletPage'));
 const TrackingPage = lazy(() => import('./pages/my/TrackingPage'));
 const GuidePage = lazy(() => import('./pages/my/GuidePage'));
 const MyInquiryPage = lazy(() => import('./pages/my/MyInquiryPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
+import { AdminI18nProvider } from './pages/admin/i18n';
 
 type AuthScreen = 'login' | 'signup' | 'find-id' | 'find-pw' | null;
 
@@ -59,7 +63,8 @@ type Screen =
   | { type: 'navChat' }
   | { type: 'navMy' }
   | { type: 'myMenu'; menu: MyMenuKey }
-  | { type: 'editProfile' };
+  | { type: 'editProfile' }
+  | { type: 'changePassword' };
 
 interface SellerInfo { name: string; temp: number; sales: number; location: string; }
 type MyMenuKey =
@@ -105,6 +110,7 @@ const getInitialScreen = (): Screen => {
 
   if (path === '/my') return { type: 'navMy' };
   if (path === '/my/edit-profile') return { type: 'editProfile' };
+  if (path === '/my/change-password') return { type: 'changePassword' };
   if (path === '/chat') return { type: 'navChat' };
   if (path === '/notifications') return { type: 'navNotification' };
   if (path === '/search') return { type: 'navSearch' };
@@ -125,7 +131,7 @@ const getInitialMainTab = (): MainTab => {
 };
 
 const getInitialAuthScreen = (): AuthScreen => {
-  const loggedIn = localStorage.getItem('bazar_logged_in') === 'true' && !!localStorage.getItem('accessToken');
+  const loggedIn = localStorage.getItem('moida_logged_in') === 'true' && !!localStorage.getItem('accessToken');
   if (loggedIn) return null;
   const path = window.location.pathname;
   if (path === '/signup') return 'signup';
@@ -134,7 +140,31 @@ const getInitialAuthScreen = (): AuthScreen => {
   return 'login';
 };
 
-const getHistoryPath = (view: AppHistoryView) => {
+/**
+ * 관리자 세션 유효성 판정.
+ *
+ * 과거에는 `moida_is_admin` 플래그 하나만 보고 isAdmin 을 결정했는데, 다음 문제가 있었다:
+ *   1) JWT 가 만료되어도 플래그가 살아있어 URL 이 /admin 으로 푸시되고
+ *      → 모든 admin API 가 401 → axios 가 / 로 리다이렉트 → 또 isAdmin=true → 무한 루프
+ *   2) 일반 사용자가 콘솔에서 플래그 한 줄 (`localStorage.setItem('moida_is_admin','true')`)
+ *      만으로 admin UI 컴포넌트를 렌더링시킬 수 있어 메뉴/대시보드 구조가 노출됨
+ *      (API 자체는 백엔드 hasAnyRole 가드로 보호되지만 UI 정보 누설)
+ *
+ * 그래서 토큰 + 로그인 플래그 + 역할(role) 세 가지 모두 충족할 때만 admin 으로 인정한다.
+ * 토큰이 죽으면 자동으로 isAdmin=false 가 되어 위 두 문제가 모두 사라진다.
+ */
+const hasAdminSession = (): boolean => {
+  const hasToken = !!localStorage.getItem('accessToken');
+  const isLoggedIn = localStorage.getItem('moida_logged_in') === 'true';
+  const role = localStorage.getItem('moida_user_role');
+  return hasToken && isLoggedIn && (role === 'ADMIN' || role === 'MANAGER');
+};
+
+const getHistoryPath = (view: AppHistoryView, isAdmin = false) => {
+  // 관리자 모드(관리자로 로그인 + admin 뷰)면 다른 화면 상태와 무관하게 /admin 으로 고정.
+  // 그렇지 않으면 authScreen이 'login'으로 남아 URL이 /login으로 잘못 찍힌다.
+  if (isAdmin && view.adminViewMode === 'admin') return '/admin';
+
   // 비로그인 auth 화면은 screen보다 우선해서 처리
   // (isGuest=true인 소셜 로그인 콜백 중에는 건너뜀)
   if (!view.isGuest) {
@@ -147,6 +177,7 @@ const getHistoryPath = (view: AppHistoryView) => {
   if (view.screen.type === 'auctionDetail') return `/auctions/${view.screen.id}`;
   if (view.screen.type === 'navMy') return '/my';
   if (view.screen.type === 'editProfile') return '/my/edit-profile';
+  if (view.screen.type === 'changePassword') return '/my/change-password';
   if (view.screen.type === 'navChat') return '/chat';
   if (view.screen.type === 'navNotification') return '/notifications';
   if (view.screen.type === 'navSearch') return '/search';
@@ -161,11 +192,11 @@ const getHistoryPath = (view: AppHistoryView) => {
 };
 
 const App: React.FC = () => {
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('bazar_is_admin') === 'true');
+  const [isAdmin, setIsAdmin] = useState(() => hasAdminSession());
   const [isLoggedIn, setIsLoggedIn] = useState(() =>
-    localStorage.getItem('bazar_logged_in') === 'true' && !!localStorage.getItem('accessToken')
+    localStorage.getItem('moida_logged_in') === 'true' && !!localStorage.getItem('accessToken')
   );
-  const [loggedInUserName, setLoggedInUserName] = useState(() => localStorage.getItem('bazar_user_name') || '');
+  const [loggedInUserName, setLoggedInUserName] = useState(() => localStorage.getItem('moida_user_name') || '');
   const [authScreen, setAuthScreen] = useState<AuthScreen>(() => getInitialAuthScreen());
   const [isGuest, setIsGuest] = useState(() => {
     // 소셜 로그인 콜백 URL이면 임시 guest 모드로 시작 → LoginPage 안 보임
@@ -213,7 +244,7 @@ const App: React.FC = () => {
   const [mainTab, setMainTab] = useState<MainTab>(() => getInitialMainTab());
   const [navTab, setNavTab] = useState<NavTab>(() => {
     const screen = getInitialScreen();
-    if (screen.type === 'navMy' || screen.type === 'editProfile' || screen.type === 'myMenu') return 'my';
+    if (screen.type === 'navMy' || screen.type === 'editProfile' || screen.type === 'myMenu' || screen.type === 'changePassword') return 'my';
     if (screen.type === 'navChat') return 'chat';
     if (screen.type === 'navNotification') return 'notification';
     if (screen.type === 'navSearch') return 'search';
@@ -227,7 +258,7 @@ const App: React.FC = () => {
   const [formDirty, setFormDirty] = useState(false);
   const [pendingNav, setPendingNav] = useState<null | (() => void)>(null);
   const [adminViewMode, setAdminViewMode] = useState<'admin' | 'normal'>(
-    () => (localStorage.getItem('bazar_admin_view') as 'admin' | 'normal') ?? 'admin'
+    () => (localStorage.getItem('moida_admin_view') as 'admin' | 'normal') ?? 'admin'
   );
 
   // 현재 폼 화면인지 여부
@@ -317,33 +348,44 @@ const App: React.FC = () => {
   }, [isLoggedIn, isAdmin]);
 
   const loginAsAdmin = () => {
-    localStorage.setItem('bazar_is_admin', 'true');
-    localStorage.setItem('bazar_admin_view', 'admin');
-    localStorage.setItem('bazar_admin_login_at', new Date().toISOString());
+    // isAdmin 판정이 hasAdminSession() (= token + logged_in + role) 기반이므로
+    // 별도 admin 플래그는 더 이상 저장하지 않는다.
+    // moida_logged_in 은 LoginPage 의 admin 분기에서 세팅하지 않으므로 여기서 보강한다.
+    localStorage.setItem('moida_logged_in', 'true');
+    // admin/normal 뷰 토글 선택과 idle 타이머 기준 시각은 인증과 무관한 UI 상태라서 그대로 유지한다.
+    localStorage.setItem('moida_admin_view', 'admin');
+    localStorage.setItem('moida_admin_login_at', new Date().toISOString());
     setIsAdmin(true);
     setAdminViewMode('admin');
     setIsGuest(false);
     setAuthScreen(null);
   };
   const logoutAdmin = () => {
-    localStorage.removeItem('bazar_is_admin');
-    localStorage.removeItem('bazar_admin_idle_warned');
-    localStorage.removeItem('bazar_admin_view');
-    localStorage.removeItem('bazar_admin_login_at');
-    localStorage.removeItem('bazar_user_name');
-    localStorage.removeItem('bazar_user_role');
+    // STOMP 알림 소켓을 토큰 제거 전에 명시적으로 끊는다.
+    // - 토큰이 살아 있는 동안 정상적인 DISCONNECT 프레임을 보내고,
+    // - reconnectDelay 로 자동 재연결이 트리거되지 않도록 deactivate() 를 직접 호출.
+    // void 처리: 동기 흐름을 막지 않기 위함이며, 끊김은 어차피 fire-and-forget 으로 충분.
+    void disconnectNotificationSocket();
+    // moida_is_admin 은 더 이상 사용하지 않는다 (hasAdminSession 기반 판정으로 전환).
+    localStorage.removeItem('moida_admin_idle_warned');
+    localStorage.removeItem('moida_admin_view');
+    localStorage.removeItem('moida_admin_login_at');
+    localStorage.removeItem('moida_logged_in');
+    localStorage.removeItem('moida_user_name');
+    localStorage.removeItem('moida_user_role');
     localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     setIsAdmin(false);
     setAdminViewMode('admin');
     setNotificationCount(0);
     setAuthScreen('login');
   };
-  const switchToNormal = () => { localStorage.setItem('bazar_admin_view', 'normal'); setAdminViewMode('normal'); };
-  const switchToAdmin = () => { localStorage.setItem('bazar_admin_view', 'admin'); setAdminViewMode('admin'); };
+  const switchToNormal = () => { localStorage.setItem('moida_admin_view', 'normal'); setAdminViewMode('normal'); };
+  const switchToAdmin = () => { localStorage.setItem('moida_admin_view', 'admin'); setAdminViewMode('admin'); };
   const login = (name?: string) => {
     const userName = name || '사용자';
-    localStorage.setItem('bazar_logged_in', 'true');
-    localStorage.setItem('bazar_user_name', userName);
+    localStorage.setItem('moida_logged_in', 'true');
+    localStorage.setItem('moida_user_name', userName);
     setIsLoggedIn(true);
     setLoggedInUserName(userName);
     setIsGuest(false); setAuthScreen(null); setScreen({ type: 'home' }); setNavTab('home');
@@ -380,10 +422,12 @@ const App: React.FC = () => {
         });
         const data = await res.json();
         console.log('소셜 로그인 응답:', data.data);
-        const { accessToken, name, role, newUser: isNewUser } = data.data;
+        const { accessToken, refreshToken, name, role, newUser: isNewUser } = data.data;
 
         localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('bazar_user_role', role);
+        // refreshToken 도 함께 보관 — access 만료 시 axios 인터셉터의 자동 갱신에 사용.
+        if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+        localStorage.setItem('moida_user_role', role);
         // URL 정리 후 홈으로
         window.history.replaceState({}, '', '/');
 
@@ -393,8 +437,8 @@ const App: React.FC = () => {
           setIsGuest(false);
           setIsSocialProcessing(false);
         } else {
-          localStorage.setItem('bazar_user_name', name);
-          localStorage.setItem('bazar_logged_in', 'true');
+          localStorage.setItem('moida_user_name', name);
+          localStorage.setItem('moida_logged_in', 'true');
           setIsSocialProcessing(false);
           login(name); // 기존 login 함수 호출
         }
@@ -408,10 +452,14 @@ const App: React.FC = () => {
   }, []); // 앱 최초 마운트 시 한 번만 실행
 
   const logout = () => {
-    localStorage.removeItem('bazar_logged_in');
-    localStorage.removeItem('bazar_user_name');
-    localStorage.removeItem('bazar_user_role');
+    // STOMP 알림 소켓을 토큰 제거 전에 명시적으로 끊는다.
+    // 자세한 이유는 logoutAdmin 의 같은 호출 참고.
+    void disconnectNotificationSocket();
+    localStorage.removeItem('moida_logged_in');
+    localStorage.removeItem('moida_user_name');
+    localStorage.removeItem('moida_user_role');
     localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     setIsLoggedIn(false);
     setLoggedInUserName('');
     setNotificationCount(0);
@@ -472,7 +520,7 @@ const App: React.FC = () => {
       adminViewMode,
     };
     const state: AppHistoryState = { source: 'moida-app', view };
-    const path = getHistoryPath(view);
+    const path = getHistoryPath(view, isAdmin);
 
     // 최초 진입 시에는 replaceState로 현재 URL에 상태만 붙여 둔다.
     if (!hasInitializedHistoryRef.current) {
@@ -496,7 +544,7 @@ const App: React.FC = () => {
     } else {
       window.history.replaceState(state, '', path);
     }
-  }, [screen, mainTab, navTab, selectedCategory, searchQuery, termsInitialTab, authScreen, isGuest, editingProduct, adminViewMode]);
+  }, [screen, mainTab, navTab, selectedCategory, searchQuery, termsInitialTab, authScreen, isGuest, editingProduct, adminViewMode, isAdmin]);
   if (isSocialProcessing) return null;
   if (socialSignupStep === 'info') {
     return (
@@ -518,8 +566,8 @@ const App: React.FC = () => {
           socialMode={true}
           socialName={socialSignupName}
           onComplete={() => {
-            localStorage.setItem('bazar_user_name', socialSignupName);
-            localStorage.setItem('bazar_logged_in', 'true');
+            localStorage.setItem('moida_user_name', socialSignupName);
+            localStorage.setItem('moida_logged_in', 'true');
             setSocialSignupStep(null);
             login(socialSignupName);
           }}
@@ -531,7 +579,9 @@ const App: React.FC = () => {
   if (isAdmin && adminViewMode === 'admin') {
     return (
       <ToastProvider>
-        <AdminPage onLogout={logoutAdmin} onSwitchToNormal={switchToNormal} />
+        <AdminI18nProvider>
+          <AdminPage onLogout={logoutAdmin} onSwitchToNormal={switchToNormal} />
+        </AdminI18nProvider>
       </ToastProvider>
     );
   }
@@ -646,7 +696,8 @@ const App: React.FC = () => {
         onRequireLogin={() => requireLogin(() => { })}
       />
     );
-    if (screen.type === 'editProfile') return <EditProfilePage onBack={goBack} />;
+    if (screen.type === 'editProfile') return <EditProfilePage onBack={goBack} onChangePassword={() => setScreen({ type: 'changePassword' })} />;
+    if (screen.type === 'changePassword') return <ChangePasswordPage onBack={goBack} />;
     if (screen.type === 'myMenu') {
       const backToMy = goBack;
       const menuMap: Record<MyMenuKey, React.ReactNode> = {
@@ -737,6 +788,11 @@ const App: React.FC = () => {
           onCancel={alertCancelCb !== null ? () => closeAlert(false) : undefined}
         />
       )}
+      {/* 실시간 알림 STOMP 구독. DOM 출력 없이 토스트 + unread 카운트 갱신만 담당. */}
+      <NotificationSocketBridge
+        isAuthenticated={isLoggedIn || isAdmin}
+        onIncoming={() => { void refreshNotificationCount(); }}
+      />
     </>
   );
 };

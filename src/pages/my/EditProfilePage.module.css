@@ -97,11 +97,23 @@
   cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
 }
 
+.btnRow {
+  display: flex; gap: 10px; margin-top: 4px;
+}
+.cancelBtn {
+  flex: 1; padding: 16px; background: none;
+  border: 1.5px solid var(--border); border-radius: 14px;
+  font-size: 15px; font-weight: 600; color: var(--muted);
+  cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
+  transition: background 0.15s;
+}
+.cancelBtn:hover { background: #F0F1F4; }
+
 .saveBtn {
-  width: 100%; padding: 16px; background: var(--primary); color: #fff;
+  flex: 1; padding: 16px; background: var(--primary); color: #fff;
   border: none; border-radius: 14px; font-size: 16px; font-weight: 700;
   cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
-  transition: opacity 0.2s; margin-top: 4px;
+  transition: opacity 0.2s;
 }
 .saveBtn:active { opacity: 0.85; }
 .loading { opacity: 0.7; cursor: not-allowed; }

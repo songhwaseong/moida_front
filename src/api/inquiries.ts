@@ -14,6 +14,7 @@ export interface InquiryResponseDto {
   itemImage?: string | null;
   seller: string;
   user: string;
+  kind?: 'product' | 'auction';
   date: string;
   question: string;
   answer?: string | null;
@@ -33,6 +34,14 @@ export interface InquiryView {
   date: string;
   question: string;
   answer: InquiryAnswerView | null;
+}
+
+export interface MyInquiryView extends InquiryView {
+  kind: 'product' | 'auction';
+  itemId: number;
+  itemName: string;
+  itemImage?: string;
+  seller: string;
 }
 
 // Convert the backend inquiry DTO into the compact shape used by detail pages.
@@ -56,6 +65,20 @@ export const getProductInquiries = async (productId: number): Promise<InquiryVie
     `/products/${productId}/inquiries`,
   );
   return response.data.data.map(toInquiryView);
+};
+
+export const toMyInquiryView = (item: InquiryResponseDto): MyInquiryView => ({
+  ...toInquiryView(item),
+  kind: item.kind ?? 'product',
+  itemId: item.productId,
+  itemName: item.itemName,
+  itemImage: item.itemImage ?? undefined,
+  seller: item.seller,
+});
+
+export const getMyInquiries = async (): Promise<MyInquiryView[]> => {
+  const response = await customAxios.get<ApiResponse<InquiryResponseDto[]>>('/inquiries/me');
+  return response.data.data.map(toMyInquiryView);
 };
 
 // Creating an inquiry requires a logged-in user; auth is attached by axiosInstance.

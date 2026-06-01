@@ -42,6 +42,10 @@ export interface AuctionDetail extends AuctionItem {
   liked: boolean;
   likeCount: number;
   timeAgo?: string;
+  // 결제 대기 흐름: 백엔드 AuctionStatus 와 일치
+  auctionStatus?: 'READY' | 'LIVE' | 'AWAITING_PAYMENT' | 'SUCCESS' | 'FAILED' | 'CANCELED' | null;
+  paymentDeadline?: string | null;   // AWAITING_PAYMENT 상태일 때만 채워짐
+  isWinner?: boolean;                // 요청 사용자가 낙찰자인지 여부
 }
 
 export interface Product {

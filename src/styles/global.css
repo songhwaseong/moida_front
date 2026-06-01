@@ -18,7 +18,8 @@
   --header-height: 104px;
 }
 
-html, body {
+html,
+body {
   font-family: 'Noto Sans KR', sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -46,11 +47,23 @@ button[class*="back"] {
   pointer-events: none;
 }
 
+button[class*="saveTopBtn"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 input {
   font-family: 'Noto Sans KR', sans-serif;
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
 }

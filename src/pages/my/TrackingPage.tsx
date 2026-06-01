@@ -1,21 +1,13 @@
 import React, { useState } from 'react';
+import { AxiosError } from 'axios';
 import styles from '../my/MySubPage.module.css';
 import tStyles from './TrackingPage.module.css';
+import { getTracking, type TrackingDto } from '../../api/tracking';
+import { CARRIERS } from '../../data/carriers';
 
 interface Props {
   onBack: () => void;
 }
-
-const CARRIERS = [
-  { code: 'CJ', name: 'CJ대한통운' },
-  { code: 'LOGEN', name: '로젠택배' },
-  { code: 'HANJIN', name: '한진택배' },
-  { code: 'POST', name: '우체국택배' },
-  { code: 'LOTTE', name: '롯데택배' },
-  { code: 'KYUNGDONG', name: '경동택배' },
-  { code: 'ILYANG', name: '일양로지스' },
-  { code: 'EPOST', name: 'EMS' },
-];
 
 type StepStatus = 'done' | 'active' | 'pending';
 
@@ -35,29 +27,21 @@ interface TrackingResult {
   steps: TrackingStep[];
 }
 
-// 택배사별 목업 데이터 생성
-const getMockResult = (carrier: string, trackingNo: string): TrackingResult => {
-  const carrierName = CARRIERS.find(c => c.code === carrier)?.name ?? carrier;
-  const now = new Date();
-  const fmt = (d: Date) =>
-    `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-  const sub = (h: number) => { const d = new Date(now); d.setHours(d.getHours() - h); return d; };
-
-  return {
-    carrier: carrierName,
-    trackingNo,
-    product: '중고 거래 상품',
-    currentStatus: '배송 중',
-    estimatedDate: (() => { const d = new Date(now); d.setDate(d.getDate()+1); return `${d.getMonth()+1}/${d.getDate()} 중 도착 예정`; })(),
-    steps: [
-      { time: fmt(sub(0)), location: '서울 송파 배송센터', status: '배송 출발', stepStatus: 'active' },
-      { time: fmt(sub(5)), location: '서울 물류센터', status: '간선상차 완료', stepStatus: 'done' },
-      { time: fmt(sub(9)), location: '부산 물류센터', status: '간선하차 완료', stepStatus: 'done' },
-      { time: fmt(sub(18)), location: '부산 배송센터', status: '집화 완료', stepStatus: 'done' },
-      { time: '', location: '', status: '배송 완료', stepStatus: 'pending' },
-    ],
-  };
-};
+// 백엔드 응답(최신순 steps)을 화면용 단계 상태로 변환한다.
+// 배송 완료면 모두 done, 그 외에는 최신 단계(index 0)를 진행 중(active)으로 표시.
+const toResult = (dto: TrackingDto): TrackingResult => ({
+  carrier: dto.carrier,
+  trackingNo: dto.trackingNo,
+  product: dto.product ?? '배송 상품',
+  currentStatus: dto.currentStatus ?? (dto.complete ? '배송 완료' : '배송 중'),
+  estimatedDate: dto.estimatedDate ?? (dto.complete ? '배송이 완료되었습니다' : '배송 예정일 정보 없음'),
+  steps: dto.steps.map((s, i) => ({
+    time: s.time ?? '',
+    location: s.location ?? '',
+    status: s.status ?? '',
+    stepStatus: dto.complete ? 'done' : i === 0 ? 'active' : 'done',
+  })),
+});
 
 const TrackingPage: React.FC<Props> = ({ onBack }) => {
   const [carrier, setCarrier] = useState('');
@@ -76,9 +60,15 @@ const TrackingPage: React.FC<Props> = ({ onBack }) => {
     setError('');
     setLoading(true);
     setResult(null);
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
-    setResult(getMockResult(carrier, trackingNo));
+    try {
+      const dto = await getTracking(carrier, trackingNo.replace(/-/g, ''));
+      setResult(toResult(dto));
+    } catch (err) {
+      const msg = (err as AxiosError<{ message?: string }>).response?.data?.message;
+      setError(msg ?? '배송 정보를 조회할 수 없습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const statusIcon: Record<StepStatus, string> = {

@@ -150,6 +150,18 @@
   color: var(--primary);
 }
 
+.optional {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.shipmentGrid {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+}
+
 /* 이미지 */
 .imageRow {
   display: flex;
@@ -274,6 +286,12 @@
   font-family: 'Noto Sans KR', sans-serif;
   background: #fff;
   transition: border-color 0.2s;
+}
+
+.inputReadonly {
+  background: #f9f8f5;
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 .input:focus {
