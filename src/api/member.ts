@@ -48,9 +48,9 @@ export interface MemberProfileResponse {
   memberNo: string;
   phone: string;
   mannerTemp: number;
-  salesCount: number;
-  purchaseCount: number;
+  winCount: number;
   bidCount: number;
+  wishCount: number;
   avatar: string;
   socialLogin: string | null;
 }

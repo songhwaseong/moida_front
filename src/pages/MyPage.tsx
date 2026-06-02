@@ -376,7 +376,7 @@ const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
       </div>
 
       <div className={styles.stats}>
-        {[[String(profile?.salesCount ?? 0), '판매'], [String(profile?.purchaseCount ?? 0), '구매'], [String(profile?.bidCount ?? 0), '입찰'], ['0', '관심']].map(([num, label], i, arr) => (
+        {[[String(profile?.winCount ?? 0), '낙찰'], [String(profile?.bidCount ?? 0), '입찰'], [String(profile?.wishCount ?? 0), '관심']].map(([num, label], i, arr) => (
           <React.Fragment key={label}>
             <div className={styles.statItem}>
               <span className={styles.statNum}>{num}</span>
