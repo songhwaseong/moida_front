@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { updateMyProduct } from '../../data/myProductStore';
+import { getProduct, updateProduct } from '../../api/products';
 import type { MyProduct } from '../../data/myProductStore';
 import { useToast } from '../../components/ToastContext';
 import styles from '../SellPage.module.css';
@@ -26,9 +26,24 @@ const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: 'B급', label: 'B급', desc: '사용감 있음' },
   { value: 'C급', label: 'C급', desc: '하자 있음' },
 ];
-const STATUS_OPTIONS: MyProduct['status'][] = ['경매예정', '낙찰', '숨김'];
+// 판매자가 직접 지정할 수 있는 상태만 노출한다. (경매예정/경매중/낙찰 등은 관리자·시스템이 관리)
+// 상품을 수정하면 다시 관리자 승인을 받도록 '승인요청'을 선택할 수 있다.
+const STATUS_OPTIONS: MyProduct['status'][] = ['승인요청중', '숨김'];
+
+// 칩에 보여줄 라벨. ('승인요청중' 상태값을 화면에서는 '승인요청'으로 표기)
+const STATUS_LABEL: Partial<Record<MyProduct['status'], string>> = {
+  '승인요청중': '승인요청',
+  '숨김': '숨김',
+};
+
+// 화면 상태 라벨 → 백엔드 ProductStatus. 매핑이 없는 상태(경매예정/유찰 등)는 변경하지 않는다(undefined).
+const STATUS_TO_API: Partial<Record<MyProduct['status'], 'PENDING' | 'HIDDEN'>> = {
+  '승인요청중': 'PENDING',
+  '숨김': 'HIDDEN',
+};
 
 const formatPrice = (v: string) => v.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const toNumber = (v: string) => Number(v.replace(/[^0-9]/g, '')) || 0;
 
 const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyChange }) => {
   const { showToast } = useToast();
@@ -42,27 +57,72 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
   const [condition, setCondition] = useState<Condition | ''>(product.condition as Condition);
   const [auctionStartPrice, setAuctionStartPrice] = useState(product.auctionStartPrice);
   const [minBidUnit, setMinBidUnit] = useState(product.minBidUnit);
+  // 즉시낙찰가는 선택값. summary 에는 없으므로 상세 로드 후 채운다.
+  const [immediatePrice, setImmediatePrice] = useState('');
   const [description, setDescription] = useState(product.description);
   const [location, setLocation] = useState(product.location);
-  const [auctionDate, setAuctionDate] = useState(product.auctionDate);
   const [status, setStatus] = useState<MyProduct['status']>(product.status);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  // 목록 API(summary)에는 설명/최소 호가단위/즉시낙찰가/전체 이미지가 없어 빈 값으로 들어온다.
+  // 상세 API로 보강한 값을 폼과 변경 감지(isDirty)의 기준선으로 함께 사용한다.
+  const [baseline, setBaseline] = useState<MyProduct>(product);
+  const [baselineImmediatePrice, setBaselineImmediatePrice] = useState('');
 
-  // 원본값과 비교해 변경 여부 감지
+  // 진입 시 상세 데이터를 불러와 폼과 기준선을 동시에 채운다. (productId 기준 1회)
+  useEffect(() => {
+    let ignore = false;
+    void (async () => {
+      try {
+        const detail = await getProduct(product.id);
+        if (ignore) return;
+        const mainIdx = Math.max(0, detail.images.indexOf(detail.image));
+        const full: MyProduct = {
+          ...product,
+          images: detail.images.length > 0 ? detail.images : product.images,
+          mainImageIndex: mainIdx,
+          title: detail.name,
+          category: detail.category,
+          condition: detail.condition,
+          auctionStartPrice: formatPrice(String(detail.startPrice ?? detail.price ?? '')),
+          minBidUnit: detail.minBidUnit != null ? formatPrice(String(detail.minBidUnit)) : '',
+          description: detail.description ?? '',
+          location: detail.location,
+        };
+        const immediate = detail.immediatePrice != null ? formatPrice(String(detail.immediatePrice)) : '';
+        setImages(full.images);
+        setMainImageIndex(full.mainImageIndex);
+        setTitle(full.title);
+        setCategory(full.category);
+        setCondition(full.condition as Condition);
+        setAuctionStartPrice(full.auctionStartPrice);
+        setMinBidUnit(full.minBidUnit);
+        setImmediatePrice(immediate);
+        setDescription(full.description);
+        setLocation(full.location);
+        setBaseline(full);
+        setBaselineImmediatePrice(immediate);
+      } catch (error) {
+        console.error('Failed to load product detail for edit', error);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [product.id]);
+
+  // 기준선(baseline)과 비교해 변경 여부 감지
   const isDirty =
-    JSON.stringify(images) !== JSON.stringify(product.images) ||
-    mainImageIndex !== product.mainImageIndex ||
-    title !== product.title ||
-    category !== product.category ||
-    condition !== product.condition ||
-    auctionStartPrice !== product.auctionStartPrice ||
-    minBidUnit !== product.minBidUnit ||
-    description !== product.description ||
-    location !== product.location ||
-    auctionDate !== product.auctionDate ||
-    status !== product.status;
+    JSON.stringify(images) !== JSON.stringify(baseline.images) ||
+    mainImageIndex !== baseline.mainImageIndex ||
+    title !== baseline.title ||
+    category !== baseline.category ||
+    condition !== baseline.condition ||
+    auctionStartPrice !== baseline.auctionStartPrice ||
+    minBidUnit !== baseline.minBidUnit ||
+    immediatePrice !== baselineImmediatePrice ||
+    description !== baseline.description ||
+    location !== baseline.location ||
+    status !== baseline.status;
 
   const handleBack = () => {
     if (isDirty) { setShowLeaveConfirm(true); } else { onBack(); }
@@ -107,6 +167,10 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
     if (!condition) e.condition = '상품 상태를 선택해주세요';
     if (!auctionStartPrice.trim()) e.auctionStartPrice = '경매 시작가를 입력해주세요';
     if (!minBidUnit.trim()) e.minBidUnit = '최소 호가 단위를 입력해주세요';
+    // 즉시낙찰가는 선택값이지만, 입력했다면 시작가보다 높아야 한다.
+    if (immediatePrice.trim() && toNumber(immediatePrice) <= toNumber(auctionStartPrice)) {
+      e.immediatePrice = '즉시낙찰가는 시작가보다 높아야 합니다';
+    }
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
     if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';
     setErrors(e);
@@ -116,25 +180,31 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
   const handleSave = async () => {
     if (!validate()) { showToast('필수 항목을 확인해주세요', 'warning'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    updateMyProduct({
-      ...product,
-      images,
-      mainImageIndex,
-      title,
-      category,
-      condition,
-      auctionStartPrice,
-      minBidUnit,
-      tradeMethod: product.tradeMethod,
-      description,
-      location,
-      auctionDate,
-      status,
-    });
-    setLoading(false);
-    showToast('상품이 수정됐어요!', 'success');
-    onSaved();
+    try {
+      await updateProduct(product.id, {
+        name: title,
+        description,
+        category,
+        condition,
+        price: toNumber(auctionStartPrice),
+        minBidUnit: toNumber(minBidUnit),
+        immediatePrice: immediatePrice.trim() ? toNumber(immediatePrice) : null,
+        location,
+        images,
+        mainImageIndex,
+        status: STATUS_TO_API[status],
+      });
+      showToast('상품이 수정됐어요!', 'success');
+      onSaved();
+    } catch (error) {
+      console.error('Failed to update product', error);
+      const message = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : '';
+      showToast(message || '상품 수정에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -160,7 +230,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
             <div className={styles.chipRow}>
               {STATUS_OPTIONS.map(s => (
                 <button key={s} className={`${styles.chip} ${status === s ? styles.chipActive : ''}`}
-                  onClick={() => setStatus(s)}>{s}</button>
+                  onClick={() => setStatus(s)}>{STATUS_LABEL[s] ?? s}</button>
               ))}
             </div>
           </div>
@@ -253,11 +323,18 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
             {errors.minBidUnit && <p className={styles.fieldError}>{errors.minBidUnit}</p>}
           </div>
 
-          {/* 경매 예정일 */}
+          {/* 즉시낙찰가 (선택) */}
           <div className={styles.section}>
-            <label className={styles.sectionTitle}>경매 예정일</label>
-            <input className={styles.input} placeholder="예) 2026.05.10" value={auctionDate}
-              onChange={e => setAuctionDate(e.target.value)}/>
+            <label className={styles.sectionTitle}>즉시낙찰가</label>
+            <p className={styles.sectionDesc}>입력하면 경매 중에도 이 금액으로 즉시 낙찰받을 수 있어요. (선택)</p>
+            <div className={styles.priceWrap}>
+              <span className={styles.pricePrefix}></span>
+              <input className={`${styles.input} ${styles.priceInput} ${errors.immediatePrice ? styles.inputError : ''}`}
+                placeholder="예) 1,000,000" value={immediatePrice}
+                onChange={e => { setImmediatePrice(formatPrice(e.target.value)); setErrors(p => ({ ...p, immediatePrice: '' })); }}
+                inputMode="numeric"/>
+            </div>
+            {errors.immediatePrice && <p className={styles.fieldError}>{errors.immediatePrice}</p>}
           </div>
 
           {/* 상품 설명 */}
@@ -301,7 +378,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
 
     {showPreview && (
       <ProductPreviewModal
-        data={{ images, mainImageIndex, title, category, condition, auctionStartPrice, minBidUnit, description, location, auctionDate }}
+        data={{ images, mainImageIndex, title, category, condition, auctionStartPrice, minBidUnit, description, location }}
         onClose={() => setShowPreview(false)}
       />
     )}

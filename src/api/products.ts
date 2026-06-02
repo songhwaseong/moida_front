@@ -101,6 +101,27 @@ export const getMyProducts = async () => {
   return unwrap(response);
 };
 
+// 판매자 본인 상품 수정 요청 페이로드. status 는 승인요청(PENDING)/숨김(HIDDEN) 만 허용된다.
+// (상품을 수정하면 다시 관리자 승인을 받도록 PENDING 으로 되돌릴 수 있다.)
+export interface ProductUpdateRequestDto {
+  name: string;
+  description: string;
+  category: string;
+  condition: string;        // 'S급' | 'A급' | 'B급' | 'C급'
+  price: number;            // 경매 시작가
+  minBidUnit?: number;
+  immediatePrice?: number | null;   // 즉시낙찰가 (선택, null 이면 미사용)
+  location: string;
+  images: string[];
+  mainImageIndex: number;
+  status?: 'PENDING' | 'HIDDEN';
+}
+
+export const updateProduct = async (productId: number, payload: ProductUpdateRequestDto) => {
+  const response = await customAxios.put<ApiResponse<number>>(`/products/${productId}`, payload);
+  return unwrap(response);
+};
+
 export const getSellerProducts = async (sellerId: number) => {
   const response = await customAxios.get<ApiResponse<ProductSummaryDto[]>>(`/products/seller/${sellerId}`);
   return unwrap(response);

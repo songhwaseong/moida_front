@@ -749,6 +749,7 @@ const App: React.FC = () => {
         onPrivacyClick={() => { setTermsInitialTab('개인정보처리방침'); setNavTab('my'); setScreen({ type: 'myMenu', menu: '이용약관' }); }}
         onMyHomeClick={() => goNav('my')}
         onMyMenuClick={(menu) => { setNavTab('my'); setScreen({ type: 'myMenu', menu: menu as MyMenuKey }); }}
+        showFooter={isHomePage}
       >
         {isHomePage ? (
           <>

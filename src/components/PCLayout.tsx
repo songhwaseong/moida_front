@@ -33,6 +33,9 @@ interface Props {
   onMyMenuClick?: (menu: string) => void;
   // 드롭다운 상단의 '마이페이지' 입구. 기존 '마이' 헤더버튼 대체.
   onMyHomeClick?: () => void;
+  // 회사정보 Footer는 홈/목록 같은 둘러보기 화면에서만 노출한다.
+  // 자체 헤더와 고정 버튼을 가진 서브페이지(상품수정 등)에서는 끈다.
+  showFooter?: boolean;
   children: React.ReactNode;
 }
 
@@ -58,6 +61,7 @@ const PCLayout: React.FC<Props> = ({
   isAdmin = false, onSwitchToAdmin,
   onTermsClick, onPrivacyClick,
   onMyMenuClick, onMyHomeClick,
+  showFooter = true,
   children,
 }) => {
   const [query, setQuery] = React.useState('');
@@ -255,7 +259,7 @@ const PCLayout: React.FC<Props> = ({
       <main id="main-scroll" className={styles.main}>
         <div className={styles.content}>
           {children}
-          <Footer onTermsClick={onTermsClick} onPrivacyClick={onPrivacyClick} />
+          {showFooter && <Footer onTermsClick={onTermsClick} onPrivacyClick={onPrivacyClick} />}
         </div>
       </main>
     </div>
