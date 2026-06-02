@@ -199,3 +199,132 @@
   color: #8B8FA8;
   font-size: 14px;
 }
+
+.faqQuestionCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  font-weight: 600;
+  text-align: left !important;
+}
+
+.faqQuestionHead {
+  text-align: left !important;
+}
+
+.faqQuestionNo {
+  min-width: 30px;
+  color: #E24B4A;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.faqCategoryBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.faqCategoryShipping {
+  background: #E3F0FF;
+  border-color: #9DC9FF;
+  color: #1565C0;
+}
+
+.faqCategoryPayment {
+  background: #EAF7EC;
+  border-color: #A8DDB0;
+  color: #2E7D32;
+}
+
+.faqCategoryAuction {
+  background: #FFF3E0;
+  border-color: #FFC47A;
+  color: #E65C00;
+}
+
+.faqCategoryAccount {
+  background: #FFF8D8;
+  border-color: #F0CF57;
+  color: #A66A00;
+}
+
+.faqCategoryDefault {
+  background: #F5F5F7;
+  border-color: #E0E0E0;
+  color: #4A4A6A;
+}
+
+.faqEditBtn {
+  border-color: #1565C0 !important;
+  background: #E3F0FF !important;
+  color: #1565C0 !important;
+  font-weight: 700;
+}
+
+.faqEditBtn:hover {
+  background: #1565C0 !important;
+  color: #fff !important;
+}
+
+.faqDeleteBtn {
+  border-color: #E24B4A !important;
+  background: #FDEEED !important;
+  color: #E24B4A !important;
+  font-weight: 700;
+}
+
+.faqDeleteBtn:hover {
+  background: #E24B4A !important;
+  color: #fff !important;
+}
+
+.pageMoveBtn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif;
+  transition: all 0.15s;
+}
+
+.pagePrevBtn {
+  background: #E3F0FF;
+  border-color: #9DC9FF;
+  color: #1565C0;
+}
+
+.pagePrevBtn:hover {
+  background: #1565C0;
+  color: #fff;
+}
+
+.pageNextBtn {
+  background: #EAF7EC;
+  border-color: #A8DDB0;
+  color: #2E7D32;
+}
+
+.pageNextBtn:hover {
+  background: #2E7D32;
+  color: #fff;
+}
+
+.pageMoveBtnDisabled,
+.pageMoveBtnDisabled:hover {
+  background: #F5F5F5;
+  border-color: #E0E0E0;
+  color: #C7C7D1;
+  cursor: default;
+}

@@ -1,14 +1,13 @@
-.page { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; padding-bottom: 0px; }
+.page { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; padding-bottom: 0; }
 
 .header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px; background: #fff; border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 50;
 }
-.back { width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:var(--text); }
+.back { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--text); }
 .title { font-size: 16px; font-weight: 700; }
 
-/* 탭 */
 .tabs { display: flex; background: #fff; border-bottom: 1px solid var(--border); }
 .tab {
   flex: 1; padding: 12px 8px; font-size: 14px; font-weight: 500; color: var(--muted);
@@ -18,26 +17,26 @@
 .tabActive { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
 
 .scroll { overflow-y: auto; }
-
-/* 배너 */
-.banner {
-  margin: 16px 16px 8px; border-radius: 16px; padding: 22px 20px;
+.status {
+  margin: 14px 16px 0; padding: 12px 14px; border-radius: 10px;
+  background: #fff; border: 1px solid var(--border);
+  color: var(--muted); font-size: 13px; line-height: 1.5;
 }
-.banner구매 { background: linear-gradient(135deg, #4A90D9 0%, #2E6DB4 100%); }
-.banner판매 { background: linear-gradient(135deg, #5BAD72 0%, #3A8A50 100%); }
-.banner경매 { background: linear-gradient(135deg, #E07B3A 0%, #C45A1A 100%); }
+
+.banner { margin: 16px 16px 8px; border-radius: 16px; padding: 22px 20px; }
+.bannerBuy { background: linear-gradient(135deg, #4A90D9 0%, #2E6DB4 100%); }
+.bannerSell { background: linear-gradient(135deg, #5BAD72 0%, #3A8A50 100%); }
+.bannerAuction { background: linear-gradient(135deg, #E07B3A 0%, #C45A1A 100%); }
 
 .bannerLabel { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
 .bannerTitle { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 6px; }
 .bannerSub { font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.5; }
 
-/* 섹션 라벨 */
 .sectionLabel {
   font-size: 13px; font-weight: 700; color: var(--muted);
   padding: 16px 16px 10px; background: var(--bg);
 }
 
-/* 단계 */
 .stepList { padding: 0 16px; }
 .stepItem { display: flex; gap: 12px; margin-bottom: 4px; }
 .stepLeft { display: flex; flex-direction: column; align-items: center; width: 28px; flex-shrink: 0; }
@@ -50,11 +49,10 @@
 .stepLine { width: 2px; flex: 1; min-height: 24px; background: var(--border); margin: 4px 0; }
 .stepBody { flex: 1; background: #fff; border-radius: 12px; border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 8px; }
 .stepHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.stepIcon { font-size: 18px; }
+.stepIcon { font-size: 12px; line-height: 1; padding: 5px 7px; border-radius: 999px; background: #F5F7FA; color: var(--primary); font-weight: 700; }
 .stepTitle { font-size: 14px; font-weight: 700; color: var(--text); }
 .stepDesc { font-size: 13px; color: var(--muted); line-height: 1.65; }
 
-/* 팁 */
 .tipList { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
 .tipItem {
   display: flex; align-items: flex-start; gap: 10px;
@@ -62,10 +60,9 @@
 }
 .tipOk { background: #EAF5EC; }
 .tipWarn { background: #FFF3F3; }
-.tipEmoji { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.tipEmoji { font-size: 12px; flex-shrink: 0; margin-top: 1px; padding: 4px 7px; border-radius: 999px; background: rgba(255,255,255,0.65); font-weight: 700; }
 .tipText { color: var(--text); font-weight: 500; }
 
-/* 고객센터 안내 */
 .csBox {
   margin: 20px 16px 0; padding: 18px; background: #fff;
   border-radius: 14px; border: 1px solid var(--border); text-align: center;
