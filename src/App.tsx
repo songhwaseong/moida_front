@@ -437,6 +437,18 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn, isAdmin]);
 
+  // 실시간 STOMP 알림이 도착했을 때의 처리.
+  // 1) 도착 즉시 배지를 +1 해서 화면에 바로 반영(체감 실시간)하고
+  // 2) 정확한 미읽음 수는 서버에서 다시 받아 보정한다.
+  // useCallback 으로 안정적인 함수 1개만 내려서 NotificationSocketBridge 가
+  // 매 렌더마다 STOMP 구독을 끊었다 다시 붙이지 않게 한다(끊긴 사이 push 유실 방지).
+  const handleIncomingNotification = useCallback(() => {
+    setNotificationCount((count) => count + 1);
+    window.setTimeout(() => {
+      void refreshNotificationCount();
+    }, 300);
+  }, [refreshNotificationCount]);
+
   useEffect(() => {
     // 로그인 세션이 준비된 경우에만 unread count를 초기 조회합니다.
     const hasToken = Boolean(localStorage.getItem('accessToken'));
@@ -959,7 +971,7 @@ const App: React.FC = () => {
       {/* 실시간 알림 STOMP 구독. DOM 출력 없이 토스트 + unread 카운트 갱신만 담당. */}
       <NotificationSocketBridge
         isAuthenticated={isLoggedIn || isAdmin}
-        onIncoming={() => { void refreshNotificationCount(); }}
+        onIncoming={handleIncomingNotification}
       />
     </>
   );

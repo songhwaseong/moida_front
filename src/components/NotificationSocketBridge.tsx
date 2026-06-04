@@ -27,9 +27,12 @@ interface Props {
 
 const WS_RECONNECT_DELAY_MS = 3000;
 
-const getWebSocketUrl = () => {
+const getWebSocketUrl = (token: string) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws`;
+  // 핸드셰이크(HTTP 업그레이드) 단계에서 서버가 Principal 을 세팅할 수 있도록 토큰을 쿼리파라미터로 전달한다.
+  // (개인 알림 user-destination 이 동작하려면 session.getPrincipal() 이 있어야 하고,
+  //  핸드셰이크는 STOMP connectHeaders 를 볼 수 없으므로 URL 로 넘긴다.)
+  return `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
 };
 
 /**
@@ -52,7 +55,7 @@ const NotificationSocketBridge: React.FC<Props> = ({ isAuthenticated, onIncoming
     if (!token) return;
 
     const client = new Client({
-      brokerURL: getWebSocketUrl(),
+      brokerURL: getWebSocketUrl(token),
       // WebSocketAuthChannelInterceptor 가 CONNECT 프레임의 Authorization 헤더에서 JWT 를 읽는다.
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: WS_RECONNECT_DELAY_MS,

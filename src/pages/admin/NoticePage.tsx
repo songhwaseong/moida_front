@@ -99,6 +99,13 @@ const NoticePage: React.FC = () => {
     setIsEditing(true);
   };
 
+  // 작성/수정 모달을 닫을 때 selected 까지 비운다.
+  // selected 가 남아 있으면 isEditing=false 가 되는 순간 상세 보기 모달이 다시 떠버린다.
+  const closeEditor = () => {
+    setIsEditing(false);
+    setSelected(null);
+  };
+
   const toRequest = (): NoticeRequestDto | null => {
     if (!editForm.title?.trim() || !editForm.content?.trim()) return null;
 
@@ -121,12 +128,12 @@ const NoticePage: React.FC = () => {
       if (selected) {
         const updated = await updateAdminNotice(selected.id, request);
         setNotices(prev => prev.map(n => n.id === updated.id ? updated : n));
-        setSelected(updated);
       } else {
         const created = await createAdminNotice(request);
         setNotices(prev => [created, ...prev]);
-        setSelected(created);
       }
+      // 저장 후에는 상세 보기 모달을 띄우지 않고 그대로 목록으로 닫는다.
+      setSelected(null);
       setIsEditing(false);
     } catch {
       setError('공지사항 저장에 실패했습니다.');
@@ -241,11 +248,13 @@ const NoticePage: React.FC = () => {
       )}
 
       {isEditing && (
-        <div className={s.overlay} onClick={() => setIsEditing(false)}>
-          <div className={s.modal} onClick={e => e.stopPropagation()}>
+        // 작성/수정 중 실수로 바깥을 눌러도 내용이 날아가지 않도록 오버레이 클릭으로는 닫지 않는다.
+        // 닫기는 취소 버튼 / 우상단 x 로만 가능.
+        <div className={s.overlay}>
+          <div className={s.modal}>
             <div className={s.modalHeader}>
               <div className={s.modalTitle}>{selected ? '공지 수정' : '공지 작성'}</div>
-              <button className={s.modalClose} onClick={() => setIsEditing(false)}>x</button>
+              <button className={s.modalClose} onClick={closeEditor}>x</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
@@ -279,7 +288,7 @@ const NoticePage: React.FC = () => {
               </div>
             </div>
             <div className={s.modalActions}>
-              <button className={s.actionBtn} onClick={() => setIsEditing(false)}>취소</button>
+              <button className={s.actionBtn} onClick={closeEditor}>취소</button>
               <button className={s.actionBtnPrimary} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'Noto Sans KR, sans-serif', opacity: saving ? 0.7 : 1 }} onClick={() => void saveNotice()} disabled={saving}>{saving ? '저장 중' : '저장'}</button>
             </div>
           </div>
