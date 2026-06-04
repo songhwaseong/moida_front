@@ -37,6 +37,11 @@ export const getNotices = async () => {
   return unwrap(response);
 };
 
+export const getNotice = async (noticeId: number) => {
+  const response = await customAxios.get<ApiResponse<NoticeDto>>(`/notices/${noticeId}`);
+  return unwrap(response);
+};
+
 export const getAdminNotices = async () => {
   const response = await customAxios.get<ApiResponse<NoticeDto[]>>('/admin/notices');
   return unwrap(response);

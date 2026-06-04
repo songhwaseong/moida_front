@@ -44,7 +44,7 @@ interface Props {
 const MY_MENU_GROUPS: { title: string; items: string[] }[] = [
   { title: '나의 거래', items: ['내 등록 상품', '입찰 내역', '구매 내역', '관심 목록', '내 문의', '배송 조회'] },
   { title: '나의 계정', items: ['내 계좌', '받은 후기', '내 주소 관리', '알림 설정'] },
-  { title: '고객지원', items: ['이용 가이드', '자주 묻는 질문', '고객센터', '이용약관'] },
+  { title: '고객지원', items: ['공지사항', '이용 가이드', '자주 묻는 질문', '고객센터', '이용약관'] },
 ];
 
 const MAIN_TABS: { id: MainTab; label: string }[] = [

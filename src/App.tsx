@@ -47,6 +47,7 @@ const ChangePasswordPage = lazy(() => import('./pages/my/ChangePasswordPage'));
 const MyWalletPage = lazy(() => import('./pages/my/MyWalletPage'));
 const TrackingPage = lazy(() => import('./pages/my/TrackingPage'));
 const GuidePage = lazy(() => import('./pages/my/GuidePage'));
+const NoticeBoardPage = lazy(() => import('./pages/my/NoticeBoardPage'));
 const MyInquiryPage = lazy(() => import('./pages/my/MyInquiryPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 import { AdminI18nProvider } from './pages/admin/i18n';
@@ -73,7 +74,7 @@ type MyMenuKey =
   | '판매 내역' | '구매 내역' | '입찰 내역' | '관심 목록' | '배송 조회'
   | '내 계좌' | '받은 후기' | '내 주소 관리' | '알림 설정'
   | '자주 묻는 질문' | '고객센터' | '이용약관' | '이용 가이드' | '내 등록 상품'
-  | '내 문의';
+  | '내 문의' | '공지사항';
 
 interface AppHistoryView {
   screen: Screen;
@@ -888,6 +889,7 @@ const App: React.FC = () => {
         '고객센터': <CustomerServicePage onBack={backToMy} />,
         '이용약관': <TermsPage onBack={backToMy} initialTab={termsInitialTab} />,
         '이용 가이드': <GuidePage onBack={backToMy} />,
+        '공지사항': <NoticeBoardPage onBack={backToMy} />,
       };
       return editingProduct
         ? <EditProductPage product={editingProduct} onBack={goBack} onSaved={() => { setEditingProduct(null); setFormDirty(false); }} onDirtyChange={setFormDirty} />
