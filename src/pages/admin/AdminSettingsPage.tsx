@@ -25,7 +25,6 @@ const AdminSettingsPage: React.FC<Props> = ({ idleMinutes, onChangeIdleMinutes }
   const [policySaving, setPolicySaving] = useState(false);
   const [policyMsg, setPolicyMsg] = useState<string | null>(null);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 페치, 정상 데이터 로딩 패턴
   useEffect(() => {
     let ignore = false;
     void (async () => {

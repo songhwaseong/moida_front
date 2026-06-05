@@ -688,11 +688,12 @@ const App: React.FC = () => {
           onGoLogin={() => { }}
           socialMode={true}
           socialName={socialSignupName}
-          onComplete={() => {
-            localStorage.setItem('moida_user_name', socialSignupName);
+          onComplete={(name) => {
+            const displayName = name || socialSignupName;
+            localStorage.setItem('moida_user_name', displayName);
             localStorage.setItem('moida_logged_in', 'true');
             setSocialSignupStep(null);
-            login(socialSignupName);
+            login(displayName);
           }}
         />
       </ToastProvider>

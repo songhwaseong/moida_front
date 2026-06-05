@@ -9,7 +9,7 @@ interface Props {
   onGoLogin: () => void;
   socialMode?: boolean;
   socialName?: string;
-  onComplete?: () => void;
+  onComplete?: (name?: string) => void;
 }
 
 type Step = 1 | 2;
@@ -188,11 +188,16 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
     if (!validateStep2()) return;
     setLoading(true);
     try {
-      await axios.put('/auth/complete-social-profile', {
+      const response = await axios.put('/auth/complete-social-profile', {
         nickname: form.nickname,
         phone: form.phone,
       });
-      onComplete?.();
+      const loginData = response.data?.data;
+      if (loginData?.accessToken) localStorage.setItem('accessToken', loginData.accessToken);
+      if (loginData?.refreshToken) localStorage.setItem('refreshToken', loginData.refreshToken);
+      if (loginData?.role) localStorage.setItem('moida_user_role', loginData.role);
+      if (loginData?.name) localStorage.setItem('moida_user_name', loginData.name);
+      onComplete?.(loginData?.name);
     } catch (error: unknown) {
       const msg = getErrorMessage(error, '프로필 등록에 실패했어요');
       setErrors(prev => ({ ...prev, general: msg }));

@@ -168,6 +168,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     const num = val.replace(/[^0-9]/g, '');
     return num ? Number(num).toLocaleString() : '';
   };
+  const toPriceNumber = (val: string) => Number(val.replace(/,/g, '')) || 0;
 
   const toggleAddonCategory = (label: string) => {
     setAddonCategories(prev =>
@@ -239,12 +240,17 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     const e: Record<string, string> = {};
     // 경매 유효성
     if (!auctionStartPrice.trim()) e.auctionStartPrice = '경매 시작가를 입력해주세요';
-    if (buyNowPrice.trim() && auctionStartPrice.trim()) {
-      const start = Number(auctionStartPrice.replace(/,/g, ''));
-      const buyNow = Number(buyNowPrice.replace(/,/g, ''));
-      if (buyNow <= start) e.buyNowPrice = '즉시낙찰가는 경매 시작가보다 높게 입력해주세요';
-    }
     if (!minBidUnit.trim()) e.minBidUnit = '최소 호가 단위를 입력해주세요';
+    const start = toPriceNumber(auctionStartPrice);
+    const bidUnit = toPriceNumber(minBidUnit);
+    if (auctionStartPrice.trim() && start <= 0) e.auctionStartPrice = '경매 시작가는 1원 이상이어야 합니다';
+    if (minBidUnit.trim() && bidUnit <= 0) e.minBidUnit = '최소 호가 단위는 1원 이상이어야 합니다';
+    if (buyNowPrice.trim() && auctionStartPrice.trim() && minBidUnit.trim()) {
+      const buyNow = toPriceNumber(buyNowPrice);
+      if (buyNow < start + bidUnit) {
+        e.buyNowPrice = '즉시낙찰가는 경매 시작가와 최소 호가 단위를 더한 금액 이상이어야 합니다';
+      }
+    }
 
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
     if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';

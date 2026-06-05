@@ -182,9 +182,15 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
     if (!condition) e.condition = '상품 상태를 선택해주세요';
     if (!auctionStartPrice.trim()) e.auctionStartPrice = '경매 시작가를 입력해주세요';
     if (!minBidUnit.trim()) e.minBidUnit = '최소 호가 단위를 입력해주세요';
-    // 즉시낙찰가는 선택값이지만, 입력했다면 시작가보다 높아야 한다.
-    if (immediatePrice.trim() && toNumber(immediatePrice) <= toNumber(auctionStartPrice)) {
-      e.immediatePrice = '즉시낙찰가는 시작가보다 높아야 합니다';
+    const start = toNumber(auctionStartPrice);
+    const bidUnit = toNumber(minBidUnit);
+    if (auctionStartPrice.trim() && start <= 0) e.auctionStartPrice = '경매 시작가는 1원 이상이어야 합니다';
+    if (minBidUnit.trim() && bidUnit <= 0) e.minBidUnit = '최소 호가 단위는 1원 이상이어야 합니다';
+    if (immediatePrice.trim() && auctionStartPrice.trim() && minBidUnit.trim()) {
+      const buyNow = toNumber(immediatePrice);
+      if (buyNow < start + bidUnit) {
+        e.immediatePrice = '즉시낙찰가는 경매 시작가와 최소 호가 단위를 더한 금액 이상이어야 합니다';
+      }
     }
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
     if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';
