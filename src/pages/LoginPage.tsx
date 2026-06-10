@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './LoginPage.module.css';
 import moidaO from '../assets/moidaO.svg';
 import googleG from '../assets/googleG.svg';
@@ -53,7 +53,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
   const [loading, setLoading] = useState(false);
   const [passwordlessLoading, setPasswordlessLoading] = useState(false);
   const [passwordlessSession, setPasswordlessSession] = useState<PasswordlessLoginStartResponse | null>(null);
-  const [passwordlessStatus, setPasswordlessStatus] = useState('');
   const [passwordlessExpiresAt, setPasswordlessExpiresAt] = useState<number | null>(null);
   const [clockTick, setClockTick] = useState(() => Date.now());
   const passwordlessSocketRef = useRef<WebSocket | null>(null);
@@ -69,6 +68,8 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
     const timer = window.setInterval(() => setClockTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [passwordlessSession]);
+
+
 
   const storeLogin = (login: LoginResponse) => {
     localStorage.setItem('accessToken', login.accessToken);
@@ -120,11 +121,8 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
 
       if (result.status === 'DENIED') {
         setError('Passwordless 인증이 거절되었습니다.');
-        setPasswordlessStatus('');
         return;
       }
-
-      setPasswordlessStatus('아직 승인 대기 중입니다. 앱에서 승인 후 다시 확인해주세요.');
     } catch (err) {
       setError(getErrorMessage(err, 'Passwordless 인증 확인에 실패했어요'));
     } finally {
@@ -134,7 +132,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
 
   const handlePasswordlessLogin = async () => {
     setError('');
-    setPasswordlessStatus('');
     if (!email.trim()) {
       setError('이메일을 입력해주세요');
       return;
@@ -151,7 +148,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
       setPasswordlessSession(session);
       setPasswordlessExpiresAt(Date.now() + session.expiresInSeconds * 1000);
       setClockTick(Date.now());
-      setPasswordlessStatus('MOIDA 앱에서 자동 비밀번호를 확인하고 승인해주세요.');
 
       if (session.pushConnectorUrl && session.pushConnectorToken) {
         const socket = new WebSocket(session.pushConnectorUrl);
@@ -171,7 +167,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
     }
   };
 
-  const cancelPasswordless = async () => {
+  const cancelPasswordless = useCallback(async () => {
     if (!passwordlessSession) return;
 
     setPasswordlessLoading(true);
@@ -183,11 +179,10 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
       passwordlessSocketRef.current?.close();
       passwordlessSocketRef.current = null;
       setPasswordlessSession(null);
-      setPasswordlessStatus('');
       setPasswordlessExpiresAt(null);
       setPasswordlessLoading(false);
     }
-  };
+  }, [passwordlessSession]);
 
   const handleSubmit = () => {
     if (loginMode === 'passwordless') {
@@ -209,7 +204,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
       passwordlessSocketRef.current?.close();
       passwordlessSocketRef.current = null;
       setPasswordlessSession(null);
-      setPasswordlessStatus('');
       setPasswordlessExpiresAt(null);
     }
   };
@@ -271,6 +265,15 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
   const passwordlessProgress = passwordlessSession && passwordlessSession.expiresInSeconds > 0
     ? Math.max(0, Math.min(100, (passwordlessRemainingSeconds / passwordlessSession.expiresInSeconds) * 100))
     : 0;
+
+  useEffect(() => {
+    if (passwordlessSession && passwordlessRemainingSeconds <= 0) {
+      const timer = setTimeout(() => {
+        void cancelPasswordless();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [passwordlessRemainingSeconds, passwordlessSession, cancelPasswordless]);
 
   return (
     <div className={styles.page}>
@@ -353,18 +356,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
                     </div>
                   </div>
                   {passwordlessSession && (
-                    <>
-                      <div className={styles.passwordlessTimeText}>남은 시간 {passwordlessRemainingSeconds}초</div>
-                      {passwordlessStatus && <p>{passwordlessStatus}</p>}
-                      <div className={styles.passwordlessActions}>
-                        <button type="button" onClick={() => void completePasswordless()} disabled={passwordlessLoading}>
-                          승인 확인
-                        </button>
-                        <button type="button" onClick={() => void cancelPasswordless()} disabled={passwordlessLoading}>
-                          취소
-                        </button>
-                      </div>
-                    </>
+                    <div className={styles.passwordlessTimeText}>남은 시간 {passwordlessRemainingSeconds}초</div>
                   )}
                 </div>
 
