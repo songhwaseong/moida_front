@@ -108,6 +108,9 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
       setRegistration(null);
       setTimeLeft(null);
       setStatus('Passwordless 등록 완료.');
+      if (onBack) {
+        setTimeout(() => onBack(), 1200);
+      }
       return;
     }
 
@@ -172,6 +175,9 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
       setAccessToken('');
       setRegistration(null);
       setStatus('Passwordless 등록 해제 완료.');
+      if (onBack) {
+        setTimeout(() => onBack(), 1200);
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err, err instanceof Error ? err.message : 'Passwordless 등록 해제 실패.'));
     } finally {
