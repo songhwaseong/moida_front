@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
+import { withdrawPasswordlessByPassword, withdrawPasswordlessByEmail } from '../api/passwordless';
+import { sendEmailCode, verifyEmailCode } from '../api/emailVerification';
 import styles from './PasswordlessManagePanel.module.css';
 
 interface ApiResponse<T> {
@@ -30,6 +32,7 @@ interface PasswordlessRegistrationStartResponse {
 }
 
 type ManageMode = 'register' | 'withdraw';
+type WithdrawMethod = 'password' | 'email';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -56,6 +59,9 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [withdrawMethod, setWithdrawMethod] = useState<WithdrawMethod>('password');
+  const [emailCode, setEmailCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -161,19 +167,68 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
     setError('');
   };
 
-  const withdraw = async () => {
+  // 평상시 해지 — 이메일+비밀번호 확인 (로그인 세션 불필요).
+  const withdrawByPassword = async () => {
     setLoading(true);
     setError('');
     setStatus('');
     socketRef.current?.close();
 
     try {
-      const token = await loginForPasswordlessManage();
-      await axiosInstance.delete<ApiResponse<null>>('/members/me/passwordless', {
-        headers: authHeader(token),
-      });
+      if (!email.trim()) throw new Error('이메일을 입력해주세요.');
+      if (!EMAIL_PATTERN.test(email)) throw new Error('이메일 형식이 올바르지 않아요.');
+      if (!password.trim()) throw new Error('비밀번호를 입력해주세요.');
+
+      await withdrawPasswordlessByPassword(email.trim(), password);
       setAccessToken('');
       setRegistration(null);
+      setStatus('Passwordless 등록 해제 완료.');
+      if (onBack) {
+        setTimeout(() => onBack(), 1200);
+      }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, err instanceof Error ? err.message : 'Passwordless 등록 해제 실패.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 분실 복구 해지 1단계 — 이메일로 인증 코드 발송.
+  const sendWithdrawEmailCode = async () => {
+    setLoading(true);
+    setError('');
+    setStatus('');
+
+    try {
+      if (!email.trim()) throw new Error('이메일을 입력해주세요.');
+      if (!EMAIL_PATTERN.test(email)) throw new Error('이메일 형식이 올바르지 않아요.');
+
+      await sendEmailCode(email.trim());
+      setCodeSent(true);
+      setStatus('인증 코드를 이메일로 보냈어요. 5분 이내에 입력해주세요.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, err instanceof Error ? err.message : '인증 코드 발송에 실패했어요.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 분실 복구 해지 2단계 — 코드 검증 후 해지.
+  const withdrawByEmail = async () => {
+    setLoading(true);
+    setError('');
+    setStatus('');
+    socketRef.current?.close();
+
+    try {
+      if (!emailCode.trim()) throw new Error('인증 코드를 입력해주세요.');
+
+      await verifyEmailCode(email.trim(), emailCode.trim());
+      await withdrawPasswordlessByEmail(email.trim());
+      setAccessToken('');
+      setRegistration(null);
+      setCodeSent(false);
+      setEmailCode('');
       setStatus('Passwordless 등록 해제 완료.');
       if (onBack) {
         setTimeout(() => onBack(), 1200);
@@ -259,38 +314,108 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
           <p>이메일/비밀번호 확인 후 QR 등록 또는 해지.</p>
         </div>
         <div className={styles.tabs}>
-          <button type="button" className={mode === 'register' ? styles.active : ''} onClick={() => setMode('register')}>
+          <button
+            type="button"
+            className={mode === 'register' ? styles.active : ''}
+            onClick={() => { setMode('register'); setError(''); setStatus(''); }}
+          >
             QR 등록
           </button>
-          <button type="button" className={mode === 'withdraw' ? styles.active : ''} onClick={() => setMode('withdraw')}>
+          <button
+            type="button"
+            className={mode === 'withdraw' ? styles.active : ''}
+            onClick={() => { setMode('withdraw'); setError(''); setStatus(''); setCodeSent(false); setEmailCode(''); }}
+          >
             해지
           </button>
         </div>
       </div>
 
-      <div className={styles.fields}>
-        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="이메일" autoComplete="email" />
-        <input
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="비밀번호"
-          type="password"
-          autoComplete="current-password"
-        />
-      </div>
-
       {mode === 'register' ? (
-        <div className={styles.actions}>
-          <button type="button" onClick={() => void startRegistration()} disabled={loading}>
-            QR 등록 시작
-          </button>
-        </div>
+        <>
+          <div className={styles.fields}>
+            <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="이메일" autoComplete="email" />
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="비밀번호"
+              type="password"
+              autoComplete="current-password"
+            />
+          </div>
+          <div className={styles.actions}>
+            <button type="button" onClick={() => void startRegistration()} disabled={loading}>
+              QR 등록 시작
+            </button>
+          </div>
+        </>
       ) : (
-        <div className={styles.actions}>
-          <button type="button" onClick={() => void withdraw()} disabled={loading}>
-            Passwordless 해지
-          </button>
-        </div>
+        <>
+          <div className={styles.subTabs}>
+            <button
+              type="button"
+              className={withdrawMethod === 'password' ? styles.active : ''}
+              onClick={() => { setWithdrawMethod('password'); setError(''); setStatus(''); }}
+            >
+              비밀번호
+            </button>
+            <button
+              type="button"
+              className={withdrawMethod === 'email' ? styles.active : ''}
+              onClick={() => { setWithdrawMethod('email'); setError(''); setStatus(''); setCodeSent(false); setEmailCode(''); }}
+            >
+              이메일 인증
+            </button>
+          </div>
+
+          <div className={styles.withdrawBody}>
+            {withdrawMethod === 'password' ? (
+              <>
+                <div className={styles.fields}>
+                  <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="이메일" autoComplete="email" />
+                  <input
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="비밀번호"
+                    type="password"
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className={styles.actions}>
+                  <button type="button" onClick={() => void withdrawByPassword()} disabled={loading}>
+                    Passwordless 해지
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={styles.qrDesc}>휴대폰/앱 분실 시, 가입한 이메일로 인증 후 해지할 수 있어요.</p>
+                <div className={styles.fields}>
+                  <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="이메일" autoComplete="email" />
+                  {codeSent && (
+                    <input
+                      value={emailCode}
+                      onChange={(event) => setEmailCode(event.target.value)}
+                      placeholder="인증 코드 6자리"
+                      inputMode="numeric"
+                      maxLength={6}
+                    />
+                  )}
+                </div>
+                <div className={styles.actions}>
+                  <button type="button" onClick={() => void sendWithdrawEmailCode()} disabled={loading}>
+                    {codeSent ? '인증 코드 재전송' : '인증 코드 받기'}
+                  </button>
+                  {codeSent && (
+                    <button type="button" onClick={() => void withdrawByEmail()} disabled={loading}>
+                      Passwordless 해지
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {status && <p className={styles.status}>{status}</p>}

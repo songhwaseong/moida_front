@@ -593,6 +593,22 @@ const App: React.FC = () => {
           body: JSON.stringify(body),
         });
         const data = await res.json();
+
+        // 소셜 로그인이 거부된 경우(예: Passwordless 등록 회원의 일반 로그인 차단 M008).
+        if (!res.ok || !data?.success || !data?.data) {
+          const message = data?.message || '소셜 로그인에 실패했습니다.';
+          // Passwordless 전용 계정이면 로그인 화면을 Passwordless 모드로 열어준다.
+          if (data?.errorCode === 'M008') {
+            localStorage.setItem('moida_login_mode', 'passwordless');
+          }
+          window.history.replaceState({}, '', '/');
+          setIsSocialProcessing(false);
+          setIsGuest(false);
+          setAuthScreen('login');
+          showAlert(message);
+          return;
+        }
+
         const { accessToken, refreshToken, name, role, newUser: isNewUser } = data.data;
 
         localStorage.setItem('accessToken', accessToken);
@@ -615,7 +631,11 @@ const App: React.FC = () => {
         }
       } catch (e) {
         console.error('소셜 로그인 실패', e);
+        window.history.replaceState({}, '', '/');
         setIsSocialProcessing(false);
+        setIsGuest(false);
+        setAuthScreen('login');
+        showAlert('소셜 로그인에 실패했습니다. 잠시 후 다시 시도해주세요.');
       }
     };
 

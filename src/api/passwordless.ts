@@ -80,3 +80,14 @@ export const confirmPasswordlessRegistration = async () => {
 export const withdrawPasswordless = async () => {
   await customAxios.delete<ApiResponse<null>>('/members/me/passwordless');
 };
+
+// 평상시 해지 — 이메일+비밀번호 확인 (로그인 세션 불필요).
+// Passwordless 등록 후에는 /auth/login 이 차단되므로 이 공개 엔드포인트로 해지한다.
+export const withdrawPasswordlessByPassword = async (email: string, password: string) => {
+  await customAxios.post<ApiResponse<null>>('/auth/passwordless/withdraw', { email, password });
+};
+
+// 분실 복구 해지 — 이메일 인증 코드 확인 (사전에 send-code/verify-code 완료 필요).
+export const withdrawPasswordlessByEmail = async (email: string) => {
+  await customAxios.post<ApiResponse<null>>('/auth/passwordless/withdraw-by-email', { email });
+};

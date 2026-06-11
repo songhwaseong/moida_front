@@ -96,6 +96,11 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
       const response = await axiosInstance.post('/auth/login', { email, password });
       storeLogin(response.data.data);
     } catch (err: unknown) {
+      // Passwordless 등록 회원은 일반 로그인이 차단된다(M008) → Passwordless 모드로 전환해 안내.
+      const errorCode = (err as { response?: { data?: { errorCode?: string } } })?.response?.data?.errorCode;
+      if (errorCode === 'M008') {
+        selectLoginMode('passwordless');
+      }
       setError(getErrorMessage(err, '이메일 또는 비밀번호를 확인해주세요'));
     } finally {
       setLoading(false);
@@ -427,7 +432,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
         )}
       </div>
 
-      {!showManage && (
+      {!showManage && loginMode !== 'passwordless' && (
         <div className={styles.socialBtns}>
           <button className={`${styles.socialBtn} ${styles.kakao}`} onClick={handleKakaoLogin}>
             <img src={kakaoTalk} alt="" aria-hidden="true" className={styles.socialIconImg} />
