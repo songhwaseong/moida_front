@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { deactivateMyAccount, getAccountDeactivationInfo, type AccountDeactivationInfoDto, getMyProfile, type MemberProfileResponse } from '../api/member';
 import styles from './MyPage.module.css';
+import { clearAuthSession } from '../utils/authStorage';
 
 type MenuKey = '입찰 내역' | '구매 내역' | '관심 목록' | '내 계좌' | '받은 후기' | '내 주소 관리' | '알림 설정' | '자주 묻는 질문' | '고객센터' | '이용약관' | '배송 조회' | '이용 가이드' | '내 등록 상품' | '내 문의' | '공지사항' | '회원탈퇴';
 type AccountDeactivationStep = 'notice' | 'verify' | 'processing' | 'complete';
@@ -180,11 +181,7 @@ const MyPage: React.FC<Props> = ({ onLogout, onMenuClick, onEditProfile }) => {
         reasonCode: accountDeactivationReasonCode,
         reasonDetail: accountDeactivationReason.trim() || undefined,
       });
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('moida_logged_in');
-      localStorage.removeItem('moida_user_name');
-      localStorage.removeItem('moida_user_role');
+      clearAuthSession();
       setAccountDeactivationStep('complete');
     } catch (error) {
       console.error('Failed to deactivate account', error);

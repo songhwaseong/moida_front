@@ -54,7 +54,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
   const [addonCategories, setAddonCategories] = useState<string[]>([]);
   const [condition, setCondition] = useState<Condition | ''>('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
   const [carrierCode, setCarrierCode] = useState('');
   const [trackingNo, setTrackingNo] = useState('');
 
@@ -87,7 +86,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     images.length > 0 || title !== '' || category !== '' ||
     addonCategories.length > 0 || condition !== '' ||
     auctionStartPrice !== '' || buyNowPrice !== '' || minBidUnit !== '' ||
-    description !== '' || location !== '' || carrierCode !== '' || trackingNo !== '' || phone !== ''
+    description !== '' || carrierCode !== '' || trackingNo !== '' || phone !== ''
   );
 
   useEffect(() => {
@@ -244,7 +243,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     }
 
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
-    if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';
     if (!carrierCode || !trackingNo) {
       e.shipment = '택배사와 송장번호를 입력해주세요';
     } else if (!/^\d{10,14}$/.test(trackingNo)) {
@@ -293,7 +291,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
         condition,
         type: 'AUCTION',
         price: Number(auctionStartPrice.replace(/,/g, '')),
-        location,
         carrierCode: carrierCode || null,
         trackingNo: trackingNo || null,
         image: images[mainImageIndex],
@@ -542,18 +539,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                 {errors.description && <p className={styles.fieldError}>{errors.description}</p>}
               </div>
 
-              {/* 거래 지역 */}
-              <div className={styles.section}>
-                <label className={styles.sectionTitle}>거래 희망 지역 <span className={styles.required}>*</span></label>
-                <input
-                  className={`${styles.input} ${errors.location ? styles.inputError : ''}`}
-                  placeholder="예: 서울 강남구 역삼동"
-                  value={location}
-                  onChange={e => { setLocation(e.target.value); setErrors(p => ({ ...p, location: '' })); }}
-                />
-                {errors.location && <p className={styles.fieldError}>{errors.location}</p>}
-              </div>
-
               <div className={styles.section}>
                 <label className={styles.sectionTitle}>배송 정보 <span className={styles.required}>*</span></label>
                 <p className={styles.sectionDesc}>택배사와 송장번호를 함께 등록해주세요.</p>
@@ -591,8 +576,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                   <span className={styles.summaryValue}>{categorySummary}</span>
                   <span className={styles.summaryLabel}>상태</span>
                   <span className={styles.summaryValue}>{condition}</span>
-                  <span className={styles.summaryLabel}>지역</span>
-                  <span className={styles.summaryValue}>{location}</span>
                   <span className={styles.summaryLabel}>경매시작가</span>
                   <span className={styles.summaryValue}>₩ {auctionStartPrice}</span>
                   <span className={styles.summaryLabel}>즉시낙찰가</span>
@@ -683,8 +666,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
                   <span className={styles.summaryValue}>{categorySummary}</span>
                   <span className={styles.summaryLabel}>상태</span>
                   <span className={styles.summaryValue}>{condition}</span>
-                  <span className={styles.summaryLabel}>지역</span>
-                  <span className={styles.summaryValue}>{location}</span>
                   <span className={styles.summaryLabel}>가격</span>
                   <span className={styles.summaryValue}>
                     {`₩ ${auctionStartPrice} (시작가)`}
@@ -728,7 +709,6 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
             buyNowPrice,
             minBidUnit,
             description,
-            location,
           }}
           onClose={() => setShowPreview(false)}
         />

@@ -21,6 +21,7 @@ import {
   NAV_STATE,
 } from '../config/config';
 import type { LoginResponse } from '../types';
+import { isAdminRole, saveAuthSession } from '../utils/authStorage';
 
 interface Props {
   onLogin: (name?: string) => void;
@@ -74,13 +75,15 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
 
 
   const storeLogin = (login: LoginResponse) => {
-    localStorage.setItem('accessToken', login.accessToken);
-    if (login.refreshToken) localStorage.setItem('refreshToken', login.refreshToken);
-    localStorage.setItem('moida_logged_in', 'true');
-    localStorage.setItem('moida_user_name', login.name);
-    localStorage.setItem('moida_user_role', login.role);
+    const adminLogin = isAdminRole(login.role);
+    saveAuthSession({
+      accessToken: login.accessToken,
+      refreshToken: login.refreshToken,
+      name: login.name,
+      role: login.role,
+    }, adminLogin ? 'session' : 'local');
 
-    if (login.role === 'ADMIN' || login.role === 'MANAGER') {
+    if (adminLogin) {
       onAdmin();
     } else {
       onLogin(login.name);

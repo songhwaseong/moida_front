@@ -240,7 +240,7 @@ const ProductDetailPage: React.FC<Props> = ({ productId, onBack, onSellerClick, 
                 <span className={styles.immediatePriceValue}> {item.immediatePrice.toLocaleString()}</span>
               </div>
             )}
-            <p className={styles.meta}>{item.location} · <span className={styles.timeGlow}>{item.timeAgo}</span></p>
+            <p className={styles.meta}><span className={styles.timeGlow}>{item.timeAgo}</span></p>
 
             {/* 판매자 */}
             <div className={styles.sellerRow}>
@@ -250,10 +250,9 @@ const ProductDetailPage: React.FC<Props> = ({ productId, onBack, onSellerClick, 
                 <div className={styles.sellerMeta}>
                   <span className={styles.sellerTemp}>🌡 {item.sellerTemp}°C</span>
                   <span className={styles.sellerSales}>거래 {item.sellerSales}회</span>
-                  <span className={styles.sellerLoc}>📍 {item.location}</span>
                 </div>
               </div>
-              <button className={styles.profileBtn} onClick={() => onSellerClick?.({ id: item.sellerId ?? item.id, name: item.seller, temp: item.sellerTemp, sales: item.sellerSales, location: item.location })}>프로필</button>
+              <button className={styles.profileBtn} onClick={() => onSellerClick?.({ id: item.sellerId ?? item.id, name: item.seller, temp: item.sellerTemp, sales: item.sellerSales, location: '' })}>프로필</button>
             </div>
 
             <ProductLiveChat
@@ -344,7 +343,6 @@ const ProductDetailPage: React.FC<Props> = ({ productId, onBack, onSellerClick, 
               <p className={styles.sectionTitle}>거래 정보</p>
               <div className={styles.infoGrid}>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>상품번호</span><span className={styles.infoValue}>{item.productNo ?? '-'}</span></div>
-                <div className={styles.infoItem}><span className={styles.infoLabel}>지역</span><span className={styles.infoValue}>{item.location}</span></div>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>경매 예정일</span><span className={styles.infoValue}>{item.auctionDate ?? '미정'}</span></div>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>조회수</span><span className={styles.infoValue}>{(item.viewCount ?? 0).toLocaleString()}회</span></div>
               </div>

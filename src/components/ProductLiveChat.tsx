@@ -7,6 +7,7 @@ import {
   type ProductChatRoomStatus,
 } from '../api/chat';
 import styles from './ProductLiveChat.module.css';
+import { getAccessToken } from '../utils/authStorage';
 
 interface Props {
   productId: number;
@@ -26,7 +27,7 @@ const getWebSocketUrl = () => {
 // 서버가 모든 구독자에게 같은 메시지를 보내므로, 현재 사용자의 JWT subject와
 // 보낸 사람 ID를 비교해서 내 메시지 여부를 프론트에서 표시한다.
 const getCurrentMemberId = () => {
-  const token = localStorage.getItem('accessToken');
+  const token = getAccessToken();
   if (!token) return null;
 
   try {
@@ -94,7 +95,7 @@ const ProductLiveChat: React.FC<Props> = ({
   }, [loadMessages]);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     const client = new Client({
       brokerURL: getWebSocketUrl(),
       connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
@@ -163,7 +164,7 @@ const ProductLiveChat: React.FC<Props> = ({
       lastSentAtRef.current = Date.now();
 
       if (stompClient?.connected) {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         // STOMP 프레임은 axios 인터셉터를 거치지 않으므로,
         // 전송 프레임에도 JWT를 직접 실어 백엔드 인증에 사용한다.
         stompClient.publish({

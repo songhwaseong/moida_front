@@ -11,7 +11,6 @@ interface PreviewData {
   buyNowPrice?: string;
   minBidUnit?: string;
   description: string;
-  location: string;
   auctionDate?: string;
 }
 
@@ -186,7 +185,6 @@ const ProductPreviewModal: React.FC<Props> = ({ data, onClose }) => {
                 <p className={styles.sellerName}>나의 상점</p>
                 <div className={styles.sellerMeta}>
                   <span className={styles.sellerTemp}>🌡 36.5°C</span>
-                  <span className={styles.sellerLoc}>📍 {data.location || '지역 미입력'}</span>
                 </div>
               </div>
             </div>
@@ -202,7 +200,7 @@ const ProductPreviewModal: React.FC<Props> = ({ data, onClose }) => {
               </div>
             )}
             <h2 className={styles.name}>{data.title || '(상품명 미입력)'}</h2>
-            <p className={styles.meta}>{data.location || '지역 미입력'} · 방금 전</p>
+            <p className={styles.meta}>방금 전</p>
 
             {/* ── 가격 표시 — 타입에 따라 라벨 분기 ── */}
             <p className={styles.price}>
@@ -252,11 +250,6 @@ const ProductPreviewModal: React.FC<Props> = ({ data, onClose }) => {
                   <span className={styles.infoValue}>{data.auctionDate}</span>
                 </div>
               )}
-
-              <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>지역</span>
-                <span className={styles.infoValue}>{data.location || '-'}</span>
-              </div>
             </div>
           </div>
 

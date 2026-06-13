@@ -13,7 +13,7 @@ export interface MyProduct {
   description: string;
   location: string;
   auctionDate: string;
-  status: '경매예정' | '승인요청중' | '경매중' | '낙찰' | '유찰' | '환수요청' | '반송중' | '환수완료' | '숨김';
+  status: '경매예정' | '승인요청중' | '보완요청' | '경매중' | '낙찰' | '유찰' | '환수요청' | '반송중' | '환수완료' | '숨김';
   price: number;
   timeAgo: string;
 }

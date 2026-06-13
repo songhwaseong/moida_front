@@ -20,6 +20,12 @@ const BANKS = [
   '부산은행', '대구은행', '경남은행', '광주은행', '전북은행',
 ];
 
+const VIRTUAL_DEPOSIT_ACCOUNT = {
+  bank: '신한은행',
+  accountNumber: '110-982-476315',
+  holder: '모이다페이',
+};
+
 interface AccountInfo {
   bank: string;
   accountNumber: string;
@@ -320,6 +326,20 @@ const MyWalletPage: React.FC<Props> = ({ onBack }) => {
             <div className={styles.infoBox}>
               <p className={styles.infoText}>입금 방법</p>
               <p className={styles.infoDesc}>입금 요청 후 가상계좌로 입금하면, 확인이 완료된 뒤 잔액에 반영됩니다.</p>
+              <div className={styles.virtualAccount}>
+                <div className={styles.vaRow}>
+                  <span className={styles.vaLabel}>은행</span>
+                  <span className={styles.vaValue}>{VIRTUAL_DEPOSIT_ACCOUNT.bank}</span>
+                </div>
+                <div className={styles.vaRow}>
+                  <span className={styles.vaLabel}>입금계좌</span>
+                  <span className={styles.vaValue}>{VIRTUAL_DEPOSIT_ACCOUNT.accountNumber}</span>
+                </div>
+                <div className={styles.vaRow}>
+                  <span className={styles.vaLabel}>예금주</span>
+                  <span className={styles.vaValue}>{VIRTUAL_DEPOSIT_ACCOUNT.holder}</span>
+                </div>
+              </div>
             </div>
             <button
               className={`${styles.actionBtn} ${depositLoading ? styles.loading : ''}`}

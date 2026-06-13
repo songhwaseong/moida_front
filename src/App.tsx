@@ -3,16 +3,30 @@ import CategoryRow from './components/CategoryRow';
 import type { MyProduct } from './data/myProductStore';
 import type { MainTab, NavTab, AuctionItem, Product, Category } from './types';
 import { CATEGORIES } from './data/mockData';
-import { getUnreadNotificationCount } from './api/notifications';
+import { getUnreadNotificationCount, type NotificationDto } from './api/notifications';
 import PCLayout from './components/PCLayout';
 import { ToastProvider } from './components/Toast';
 import NotificationSocketBridge from './components/NotificationSocketBridge';
 import { disconnectNotificationSocket } from './components/notificationSocket';
+import { emitIncomingNotification } from './components/notificationEvents';
 import LeaveConfirmModal from './components/LeaveConfirmModal';
 import AlertModal from './components/AlertModal';
 import SellNoticeModal from './components/SellNoticeModal';
 import { IDLE_OPTIONS, type IdleMinutes } from './pages/admin/adminSettingsOptions';
 import { recordAdminAuditEvent, type AdminAuditEventAction } from './api/adminAuditEvents';
+import {
+  clearAuthSession,
+  getAccessToken,
+  getAdminUiItem,
+  getLoggedInUserName,
+  hasAdminAuthSession,
+  hasAuthSession,
+  isAdminRole,
+  removeAdminUiItem,
+  saveAuthSession,
+  setAdminUiItem,
+  setStoredLoginUser,
+} from './utils/authStorage';
 import styles from './App.module.css';
 import './styles/global.css';
 
@@ -66,7 +80,15 @@ type Screen =
   | { type: 'navNotification' }
   | { type: 'navChat' }
   | { type: 'navMy' }
-  | { type: 'myMenu'; menu: MyMenuKey; noticeId?: number }
+  | {
+      type: 'myMenu';
+      menu: MyMenuKey;
+      noticeId?: number;
+      trackingCarrier?: string;
+      trackingNo?: string;
+      trackingStatus?: string;
+      trackingProduct?: string;
+    }
   | { type: 'editProfile' }
   | { type: 'changePassword' };
 
@@ -132,10 +154,27 @@ const getInitialScreen = (): Screen => {
   if (path === '/notifications') return { type: 'navNotification' };
   if (path === '/search') return { type: 'navSearch' };
   if (path.startsWith('/my/')) {
-    const menu = decodeURIComponent(path.slice(4)) as MyMenuKey;
-    const noticeId = Number(new URLSearchParams(window.location.search).get('noticeId'));
+    const rawMenu = decodeURIComponent(path.slice(4));
+    const menu = ({
+      purchases: '구매 내역',
+      tracking: '배송 조회',
+      products: '내 등록 상품',
+      bids: '입찰 내역',
+    } as Record<string, MyMenuKey>)[rawMenu] ?? rawMenu as MyMenuKey;
+    const params = new URLSearchParams(window.location.search);
+    const noticeId = Number(params.get('noticeId'));
     if (menu === '공지사항' && Number.isFinite(noticeId) && noticeId > 0) {
       return { type: 'myMenu', menu, noticeId };
+    }
+    if (menu === '배송 조회') {
+      return {
+        type: 'myMenu',
+        menu,
+        trackingCarrier: params.get('carrier') ?? undefined,
+        trackingNo: params.get('invoice') ?? undefined,
+        trackingStatus: params.get('status') ?? undefined,
+        trackingProduct: params.get('product') ?? undefined,
+      };
     }
     return { type: 'myMenu', menu };
   }
@@ -152,7 +191,7 @@ const getInitialMainTab = (): MainTab => {
 };
 
 const getInitialAuthScreen = (): AuthScreen => {
-  const loggedIn = localStorage.getItem('moida_logged_in') === 'true' && !!localStorage.getItem('accessToken');
+  const loggedIn = hasAuthSession();
   if (loggedIn) return null;
   const path = window.location.pathname;
   if (path === '/signup') return 'signup';
@@ -175,10 +214,7 @@ const getInitialAuthScreen = (): AuthScreen => {
  * 토큰이 죽으면 자동으로 isAdmin=false 가 되어 위 두 문제가 모두 사라진다.
  */
 const hasAdminSession = (): boolean => {
-  const hasToken = !!localStorage.getItem('accessToken');
-  const isLoggedIn = localStorage.getItem('moida_logged_in') === 'true';
-  const role = localStorage.getItem('moida_user_role');
-  return hasToken && isLoggedIn && (role === 'ADMIN' || role === 'MANAGER');
+  return hasAdminAuthSession();
 };
 
 const getHistoryPath = (view: AppHistoryView, isAdmin = false) => {
@@ -204,9 +240,19 @@ const getHistoryPath = (view: AppHistoryView, isAdmin = false) => {
   if (view.screen.type === 'navSearch') return '/search';
   if (view.screen.type === 'myMenu') {
     const base = `/my/${encodeURIComponent(view.screen.menu)}`;
-    return view.screen.menu === '공지사항' && view.screen.noticeId
-      ? `${base}?noticeId=${view.screen.noticeId}`
-      : base;
+    if (view.screen.menu === '공지사항' && view.screen.noticeId) {
+      return `${base}?noticeId=${view.screen.noticeId}`;
+    }
+    if (view.screen.menu === '배송 조회') {
+      const params = new URLSearchParams();
+      if (view.screen.trackingCarrier) params.set('carrier', view.screen.trackingCarrier);
+      if (view.screen.trackingNo) params.set('invoice', view.screen.trackingNo);
+      if (view.screen.trackingStatus) params.set('status', view.screen.trackingStatus);
+      if (view.screen.trackingProduct) params.set('product', view.screen.trackingProduct);
+      const query = params.toString();
+      return query ? `${base}?${query}` : base;
+    }
+    return base;
   }
   if (view.screen.type === 'home') {
     if (view.mainTab === '경매') return '/auction';
@@ -219,10 +265,8 @@ const getHistoryPath = (view: AppHistoryView, isAdmin = false) => {
 
 const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(() => hasAdminSession());
-  const [isLoggedIn, setIsLoggedIn] = useState(() =>
-    localStorage.getItem('moida_logged_in') === 'true' && !!localStorage.getItem('accessToken')
-  );
-  const [loggedInUserName, setLoggedInUserName] = useState(() => localStorage.getItem('moida_user_name') || '');
+  const [isLoggedIn, setIsLoggedIn] = useState(() => hasAuthSession());
+  const [loggedInUserName, setLoggedInUserName] = useState(() => getLoggedInUserName());
   const [authScreen, setAuthScreen] = useState<AuthScreen>(() => getInitialAuthScreen());
   const [isGuest, setIsGuest] = useState(() => {
     // 소셜 로그인 콜백 URL이면 임시 guest 모드로 시작 → LoginPage 안 보임
@@ -287,7 +331,7 @@ const App: React.FC = () => {
   const [formDirty, setFormDirty] = useState(false);
   const [pendingNav, setPendingNav] = useState<null | (() => void)>(null);
   const [adminViewMode, setAdminViewMode] = useState<'admin' | 'normal'>(
-    () => (localStorage.getItem('moida_admin_view') as 'admin' | 'normal') ?? 'admin'
+    () => (getAdminUiItem('moida_admin_view') as 'admin' | 'normal' | null) ?? 'admin'
   );
   const [adminIdleMinutes, setAdminIdleMinutes] = useState<IdleMinutes>(readAdminIdleMinutes);
   const [showAdminIdleModal, setShowAdminIdleModal] = useState(false);
@@ -337,14 +381,7 @@ const App: React.FC = () => {
     showAdminIdleModalRef.current = false;
     setShowAdminIdleModal(false);
     void disconnectNotificationSocket();
-    localStorage.removeItem('moida_admin_idle_warned');
-    localStorage.removeItem('moida_admin_view');
-    localStorage.removeItem('moida_admin_login_at');
-    localStorage.removeItem('moida_logged_in');
-    localStorage.removeItem('moida_user_name');
-    localStorage.removeItem('moida_user_role');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    clearAuthSession();
     setIsAdmin(false);
     setIsLoggedIn(false);
     setLoggedInUserName('');
@@ -358,7 +395,7 @@ const App: React.FC = () => {
     actionType: AdminAuditEventAction,
     reason: string,
   ) => {
-    const hasToken = Boolean(localStorage.getItem('accessToken'));
+    const hasToken = Boolean(getAccessToken());
     if (hasToken) {
       try {
         await recordAdminAuditEvent(actionType, reason);
@@ -387,7 +424,7 @@ const App: React.FC = () => {
   const scheduleAdminIdleWarning = useCallback(() => {
     clearAdminIdleTimer();
     adminIdleTimerRef.current = setTimeout(() => {
-      localStorage.setItem(ADMIN_IDLE_WARNED_KEY, '1');
+      setAdminUiItem(ADMIN_IDLE_WARNED_KEY, '1');
       showAdminIdleModalRef.current = true;
       setShowAdminIdleModal(true);
       startAdminIdleCountdown();
@@ -400,7 +437,7 @@ const App: React.FC = () => {
   }, [isAdmin, scheduleAdminIdleWarning]);
 
   const continueAdminSession = useCallback(() => {
-    localStorage.removeItem(ADMIN_IDLE_WARNED_KEY);
+    removeAdminUiItem(ADMIN_IDLE_WARNED_KEY);
     showAdminIdleModalRef.current = false;
     setShowAdminIdleModal(false);
     clearAdminIdleCountdown();
@@ -451,7 +488,7 @@ const App: React.FC = () => {
 
   // 알림 탭에서 읽음 상태가 바뀐 뒤 상단 badge를 다시 맞춥니다.
   const refreshNotificationCount = useCallback(async () => {
-    const hasToken = Boolean(localStorage.getItem('accessToken'));
+    const hasToken = Boolean(getAccessToken());
     if ((!isLoggedIn && !isAdmin) || !hasToken) {
       return;
     }
@@ -467,18 +504,89 @@ const App: React.FC = () => {
 
   // 실시간 STOMP 알림이 도착했을 때의 처리.
   // 1) 도착 즉시 배지를 +1 해서 화면에 바로 반영(체감 실시간)하고
-  // 2) 정확한 미읽음 수는 서버에서 다시 받아 보정한다.
+  // 2) 알림 화면이 열려 있으면 이벤트 버스로 목록에 즉시 추가하고
+  // 3) 정확한 미읽음 수는 서버에서 다시 받아 보정한다.
   // useCallback 으로 안정적인 함수 1개만 내려서 NotificationSocketBridge 가
   // 매 렌더마다 STOMP 구독을 끊었다 다시 붙이지 않게 한다(끊긴 사이 push 유실 방지).
-  const handleIncomingNotification = useCallback(() => {
+  const handleIncomingNotification = useCallback((notification: NotificationDto) => {
     setNotificationCount((count) => count + 1);
+    emitIncomingNotification(notification);
     window.setTimeout(() => {
       void refreshNotificationCount();
     }, 300);
   }, [refreshNotificationCount]);
 
-  const handleNotificationLink = useCallback((linkUrl: string) => {
-    const noticeMatch = linkUrl.match(/^\/notices\/(\d+)\/?$/);
+  const isWalletDepositApprovalNotification = (notification?: NotificationDto) => {
+    if (!notification) return false;
+    const text = `${notification.type} ${notification.title} ${notification.content}`.toLowerCase();
+    return (
+      text.includes('wallet_deposit') ||
+      text.includes('deposit_confirm') ||
+      text.includes('deposit_approved') ||
+      text.includes('입금 승인') ||
+      text.includes('입금 확인') ||
+      text.includes('입금 완료') ||
+      text.includes('충전 승인') ||
+      text.includes('충전 완료') ||
+      text.includes('잔액에 반영') ||
+      /입금.*(승인|확인|완료|반영)/.test(text) ||
+      /충전.*(승인|확인|완료|반영)/.test(text)
+    );
+  };
+
+  const handleNotificationLink = useCallback((linkUrl: string, notification?: NotificationDto) => {
+    if (isWalletDepositApprovalNotification(notification)) {
+      setNavTab('my');
+      setScreen({ type: 'myMenu', menu: '내 계좌' });
+      return;
+    }
+
+    const url = new URL(linkUrl, window.location.origin);
+    const path = url.pathname;
+    const detailMatch = path.match(/^\/(products?|auctions?)\/(\d+)\/?$/);
+    if (detailMatch) {
+      const id = Number(detailMatch[2]);
+      if (Number.isFinite(id)) {
+        setScreen({
+          type: detailMatch[1].startsWith('auction') ? 'auctionDetail' : 'productDetail',
+          id,
+        });
+      }
+      return;
+    }
+
+    if (path === '/my/purchases') {
+      setNavTab('my');
+      setScreen({ type: 'myMenu', menu: '구매 내역' });
+      return;
+    }
+
+    if (path === '/my/products') {
+      setNavTab('my');
+      setScreen({ type: 'myMenu', menu: '내 등록 상품' });
+      return;
+    }
+
+    if (path === '/my/wallet' || path === '/my/account' || path === '/wallet') {
+      setNavTab('my');
+      setScreen({ type: 'myMenu', menu: '내 계좌' });
+      return;
+    }
+
+    if (path === '/my/tracking') {
+      setNavTab('my');
+      setScreen({
+        type: 'myMenu',
+        menu: '배송 조회',
+        trackingCarrier: url.searchParams.get('carrier') ?? undefined,
+        trackingNo: url.searchParams.get('invoice') ?? undefined,
+        trackingStatus: url.searchParams.get('status') ?? undefined,
+        trackingProduct: url.searchParams.get('product') ?? undefined,
+      });
+      return;
+    }
+
+    const noticeMatch = path.match(/^\/notices\/(\d+)\/?$/);
     if (noticeMatch) {
       const noticeId = Number(noticeMatch[1]);
       setNavTab('my');
@@ -488,7 +596,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // 로그인 세션이 준비된 경우에만 unread count를 초기 조회합니다.
-    const hasToken = Boolean(localStorage.getItem('accessToken'));
+    const hasToken = Boolean(getAccessToken());
     if ((!isLoggedIn && !isAdmin) || !hasToken) return;
 
     let ignore = false;
@@ -512,10 +620,9 @@ const App: React.FC = () => {
     // isAdmin 판정이 hasAdminSession() (= token + logged_in + role) 기반이므로
     // 별도 admin 플래그는 더 이상 저장하지 않는다.
     // moida_logged_in 은 LoginPage 의 admin 분기에서 세팅하지 않으므로 여기서 보강한다.
-    localStorage.setItem('moida_logged_in', 'true');
     // admin/normal 뷰 토글 선택과 idle 타이머 기준 시각은 인증과 무관한 UI 상태라서 그대로 유지한다.
-    localStorage.setItem('moida_admin_view', 'admin');
-    localStorage.setItem('moida_admin_login_at', new Date().toISOString());
+    setAdminUiItem('moida_admin_view', 'admin');
+    setAdminUiItem('moida_admin_login_at', new Date().toISOString());
     setIsAdmin(true);
     setAdminViewMode('admin');
     setIsGuest(false);
@@ -526,12 +633,11 @@ const App: React.FC = () => {
   // 새로고침 후처럼 두 플래그가 모두 true 인 상태에서 한 번에 로그아웃되지 않고
   // "본인 계정 화면으로 바뀐 뒤 다시 로그아웃" 해야 하는 문제가 있었다.
   const logoutAdmin = () => { void clearAdminSessionWithAudit('ADMIN_LOGOUT', '관리자 수동 로그아웃'); };
-  const switchToNormal = () => { localStorage.setItem('moida_admin_view', 'normal'); setAdminViewMode('normal'); };
-  const switchToAdmin = () => { localStorage.setItem('moida_admin_view', 'admin'); setAdminViewMode('admin'); };
+  const switchToNormal = () => { setAdminUiItem('moida_admin_view', 'normal'); setAdminViewMode('normal'); };
+  const switchToAdmin = () => { setAdminUiItem('moida_admin_view', 'admin'); setAdminViewMode('admin'); };
   const login = (name?: string) => {
     const userName = name || '사용자';
-    localStorage.setItem('moida_logged_in', 'true');
-    localStorage.setItem('moida_user_name', userName);
+    setStoredLoginUser(userName);
     setIsLoggedIn(true);
     setLoggedInUserName(userName);
     setIsGuest(false); setAuthScreen(null); setScreen({ type: 'home' }); setNavTab('home');
@@ -542,12 +648,12 @@ const App: React.FC = () => {
       clearAdminIdleTimer();
       clearAdminIdleCountdown();
       showAdminIdleModalRef.current = false;
-      localStorage.removeItem(ADMIN_IDLE_WARNED_KEY);
+      removeAdminUiItem(ADMIN_IDLE_WARNED_KEY);
       return;
     }
 
-    if (localStorage.getItem(ADMIN_IDLE_WARNED_KEY)) {
-      localStorage.removeItem(ADMIN_IDLE_WARNED_KEY);
+    if (getAdminUiItem(ADMIN_IDLE_WARNED_KEY)) {
+      removeAdminUiItem(ADMIN_IDLE_WARNED_KEY);
       const logoutTimer = window.setTimeout(() => {
         void clearAdminSessionWithAudit('ADMIN_IDLE_TIMEOUT', '관리자 세션 유휴 시간 초과');
       }, 0);
@@ -612,11 +718,16 @@ const App: React.FC = () => {
         }
 
         const { accessToken, refreshToken, name, role, newUser: isNewUser } = data.data;
+        const authMode = isAdminRole(role) ? 'session' : 'local';
+        saveAuthSession({
+          accessToken,
+          refreshToken,
+          role,
+          name: isNewUser ? undefined : name,
+          loggedIn: !isNewUser,
+        }, authMode);
 
-        localStorage.setItem('accessToken', accessToken);
         // refreshToken 도 함께 보관 — access 만료 시 axios 인터셉터의 자동 갱신에 사용.
-        if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
-        localStorage.setItem('moida_user_role', role);
         // URL 정리 후 홈으로
         window.history.replaceState({}, '', '/');
 
@@ -626,10 +737,12 @@ const App: React.FC = () => {
           setIsGuest(false);
           setIsSocialProcessing(false);
         } else {
-          localStorage.setItem('moida_user_name', name);
-          localStorage.setItem('moida_logged_in', 'true');
           setIsSocialProcessing(false);
-          login(name); // 기존 login 함수 호출
+          if (isAdminRole(role)) {
+            loginAsAdmin();
+          } else {
+            login(name); // 기존 login 함수 호출
+          }
         }
       } catch (e) {
         console.error('소셜 로그인 실패', e);
@@ -747,8 +860,6 @@ const App: React.FC = () => {
           socialName={socialSignupName}
           onComplete={(name) => {
             const displayName = name || socialSignupName;
-            localStorage.setItem('moida_user_name', displayName);
-            localStorage.setItem('moida_logged_in', 'true');
             setSocialSignupStep(null);
             login(displayName);
           }}
@@ -935,7 +1046,16 @@ const App: React.FC = () => {
       const menuMap: Record<MyMenuKey, React.ReactNode> = {
         '판매 내역': <SalesHistoryPage onBack={backToMy} />,
         '내 등록 상품': <MyProductsPage onBack={backToMy} onEdit={(p) => setEditingProduct(p)} />,
-        '배송 조회': <TrackingPage onBack={backToMy} />,
+        '배송 조회': (
+          <TrackingPage
+            key={[screen.trackingCarrier ?? '', screen.trackingNo ?? '', screen.trackingStatus ?? '', screen.trackingProduct ?? ''].join(':')}
+            onBack={backToMy}
+            initialCarrier={screen.trackingCarrier}
+            initialTrackingNo={screen.trackingNo}
+            initialStatus={screen.trackingStatus}
+            initialProduct={screen.trackingProduct}
+          />
+        ),
         '구매 내역': <PurchaseHistoryPage onBack={backToMy} />,
         '입찰 내역': <BidHistoryPage onBack={backToMy} />,
         '관심 목록': <WishlistPage onProductClick={handleProductClick} onAuctionClick={handleAuctionClick} onBack={backToMy} />,

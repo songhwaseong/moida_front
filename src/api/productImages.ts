@@ -27,8 +27,42 @@ interface PresignResponse {
 
 const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
+const LOCAL_IMAGE_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const MAX_LOCAL_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_LOCAL_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const shouldUseLocalDataUrlUpload = () => (
+  typeof window !== 'undefined' && LOCAL_IMAGE_HOSTS.has(window.location.hostname)
+);
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  if (!ALLOWED_LOCAL_IMAGE_TYPES.has(file.type)) {
+    reject(new Error('jpg, png, webp 이미지만 업로드할 수 있습니다.'));
+    return;
+  }
+  if (file.size <= 0 || file.size > MAX_LOCAL_IMAGE_SIZE_BYTES) {
+    reject(new Error('이미지 파일은 10MB 이하만 업로드할 수 있습니다.'));
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result === 'string') {
+      resolve(reader.result);
+      return;
+    }
+    reject(new Error('이미지 파일을 읽지 못했습니다.'));
+  };
+  reader.onerror = () => reject(new Error('이미지 파일을 읽지 못했습니다.'));
+  reader.readAsDataURL(file);
+});
+
 export const uploadProductImages = async (files: File[]): Promise<string[]> => {
   if (files.length === 0) return [];
+
+  if (shouldUseLocalDataUrlUpload()) {
+    return Promise.all(files.map(readFileAsDataUrl));
+  }
 
   const request: PresignRequest = {
     files: files.map(file => ({

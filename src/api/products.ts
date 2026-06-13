@@ -25,7 +25,7 @@ export interface ProductSummaryDto {
   auctionDate?: string | null;
   category: string;
   type: 'AUCTION';
-  status?: 'SCHEDULED' | 'PENDING' | 'LIVE' | 'SOLD' | 'FAILED' | 'RETURN_REQUESTED' | 'RETURN_SHIPPING' | 'RETURN_COMPLETED' | 'HIDDEN' | 'DELETED';
+  status?: 'SCHEDULED' | 'PENDING' | 'NEEDS_REVISION' | 'LIVE' | 'SOLD' | 'FAILED' | 'RETURN_REQUESTED' | 'RETURN_SHIPPING' | 'RETURN_COMPLETED' | 'HIDDEN' | 'DELETED';
   auctionNo?: string | null;
   currentPrice?: number | null;
   bidCount?: number | null;
@@ -36,6 +36,8 @@ export interface ProductSummaryDto {
   paymentDeadline?: string | null;
   deliveryStatus?: DeliveryStatus | null;
   deliveryStatusLabel?: string | null;
+  reviewRevisionReason?: string | null;
+  reviewRevisionRequestedAt?: string | null;
 }
 
 export interface ProductDetailDto extends ProductSummaryDto {

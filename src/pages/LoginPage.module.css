@@ -168,6 +168,8 @@ input[type="password"]::-ms-reveal {
   background: var(--primary-light);
   padding: 10px 14px;
   border-radius: 10px;
+  white-space: pre-line;
+  line-height: 1.5;
 }
 
 .loginBtn {

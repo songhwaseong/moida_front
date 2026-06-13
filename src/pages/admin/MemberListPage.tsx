@@ -5,6 +5,7 @@ import styles from './admin.module.css';
 import axiosInstance from '../../api/axiosInstance';
 import { updateAdminMemberRole } from '../../api/adminMembers';
 import { useAdminDialog } from './useAdminDialog';
+import { getUserRole } from '../../utils/authStorage';
 
 type StatusFilter = 'all' | 'active' | 'suspended' | 'permanent' | 'withdrawn';
 
@@ -29,7 +30,7 @@ const MemberListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 5;
 
-  const currentRole = localStorage.getItem('moida_user_role');
+  const currentRole = getUserRole();
 
   const handleRoleToggle = async (m: Member) => {
     if (!m.id) {

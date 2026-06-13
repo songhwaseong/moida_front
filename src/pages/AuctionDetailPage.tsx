@@ -396,7 +396,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
 
             {/* 상품명 */}
             <h1 className={styles.name}>{item.name}</h1>
-            <p className={styles.location}>📍 {item.location} · <span className={styles.timeGlow}>{item.endDate} 마감</span></p>
+            <p className={styles.location}><span className={styles.timeGlow}>{item.endDate} 마감</span></p>
 
             {/* 가격 + 입찰 박스 */}
             <div className={styles.priceBox}>
@@ -519,7 +519,7 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
                 </div>
                 <button
                   className={styles.sellerChat}
-                  onClick={() => onSellerClick?.({ id: item.sellerId ?? item.id, name: item.seller, temp: item.sellerTemp, sales: item.sellerSales, location: item.location })}
+                  onClick={() => onSellerClick?.({ id: item.sellerId ?? item.id, name: item.seller, temp: item.sellerTemp, sales: item.sellerSales, location: '' })}
                 >프로필</button>
               </div>
               <ProductLiveChat
@@ -612,7 +612,6 @@ const AuctionDetailPage: React.FC<Props> = ({ itemId, onBack, isLoggedIn = false
               <div className={styles.infoGrid}>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>상품번호</span><span className={styles.infoValue} style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.productNo ?? item.auctionNo}</span></div>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>경매번호</span><span className={styles.infoValue}>{item.auctionNo}</span></div>
-                <div className={styles.infoItem}><span className={styles.infoLabel}>지역</span><span className={styles.infoValue}>{item.location}</span></div>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>카테고리</span><span className={styles.infoValue}>{item.category}</span></div>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>마감일</span><span className={styles.infoValue}>{item.endDate}</span></div>
                 <div className={styles.infoItem}><span className={styles.infoLabel}>조회수</span><span className={styles.infoValue}>{(item.viewCount ?? 0).toLocaleString()}회</span></div>

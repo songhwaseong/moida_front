@@ -10,6 +10,7 @@ interface ApiResponse<T> {
 export type AdminProductStatus =
   | '경매예정'
   | '승인요청중'
+  | '보완요청'
   | '경매중'
   | '낙찰'
   | '유찰'
@@ -36,6 +37,8 @@ export interface AdminProductDto {
   trackingNo: string | null;
   returnRequestReason: string | null;
   returnRequestedAt: string | null;
+  reviewRevisionReason: string | null;
+  reviewRevisionRequestedAt: string | null;
 }
 
 // 상세 조회 응답. 목록 DTO에 더해 등록된 모든 이미지(images)를 포함한다.
@@ -47,6 +50,7 @@ export interface AdminProductStatsDto {
   total: number;
   selling: number;
   approving: number;
+  revisionRequested: number;
   inBid: number;
   hidden: number;
 }
@@ -57,6 +61,7 @@ const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 const STATUS_TO_ENUM: Record<AdminProductStatus, string> = {
   '경매예정': 'SCHEDULED',
   '승인요청중': 'PENDING',
+  '보완요청': 'NEEDS_REVISION',
   '경매중': 'LIVE',
   '낙찰': 'SOLD',
   '유찰': 'FAILED',

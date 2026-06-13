@@ -13,6 +13,7 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "../config/config";
 import { disconnectNotificationSocket } from "../components/notificationSocket";
+import { clearAuthSession, getAccessToken, getRefreshToken, updateStoredTokens } from "../utils/authStorage";
 
 // withCredentials: true 항목은 세션 방식 설정이므로 jwt를 사용하면 삭제하도록 합니다.
 const axiosInstance = axios.create({
@@ -28,7 +29,7 @@ const axiosInstance = axios.create({
 let refreshInFlight: Promise<string | null> | null = null;
 
 const refreshTokens = async (): Promise<string | null> => {
-    const refreshToken = localStorage.getItem("refreshToken");
+    const refreshToken = getRefreshToken();
     if (!refreshToken) return null;
 
     try {
@@ -37,8 +38,7 @@ const refreshTokens = async (): Promise<string | null> => {
         const data = response.data?.data as { accessToken?: string; refreshToken?: string } | undefined;
         if (!data?.accessToken) return null;
 
-        localStorage.setItem("accessToken", data.accessToken);
-        if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
+        updateStoredTokens(data.accessToken, data.refreshToken);
         return data.accessToken;
     } catch {
         return null;
@@ -52,20 +52,12 @@ const triggerHardLogout = () => {
     void disconnectNotificationSocket();
 
     // 토큰과 함께 App.tsx 가 로그인 상태로 판단하는 플래그도 같이 정리.
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("moida_logged_in");
-    localStorage.removeItem("moida_user_name");
-    localStorage.removeItem("moida_user_role");
+    clearAuthSession();
 
     // admin 전용 UI 상태(뷰 토글, idle 타이머)도 함께 정리.
     // 핵심: isAdmin 판정 자체가 hasAdminSession() (=token + logged_in + role) 기반이라
     // accessToken/logged_in 만 지워도 isAdmin 은 자동으로 false 가 된다. 그래서 별도 admin 플래그
     // (과거 moida_is_admin) 는 더 이상 존재하지 않는다. 아래 항목들은 단순 UI 상태 정리 용도.
-    localStorage.removeItem("moida_admin_view");
-    localStorage.removeItem("moida_admin_login_at");
-    localStorage.removeItem("moida_admin_idle_warned");
-
     window.location.replace("/");
 };
 
@@ -73,7 +65,7 @@ const triggerHardLogout = () => {
 // 요청 인터셉터 — Authorization 자동 부착
 axiosInstance.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
         // 로그인/회원가입/소셜로그인 등 auth 엔드포인트에는 토큰을 붙이지 않는다 (이미 비로그인 상태).
         // 단 complete-social-profile 은 토큰이 필요한 후처리이므로 예외 처리.
         const isAuthRequest = config.url?.includes("/auth/") && !config.url?.includes("complete-social-profile");

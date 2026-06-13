@@ -3,6 +3,7 @@ import styles from './SignupPage.module.css';
 
 import axios from '../api/axiosInstance';
 import { sendPhoneCode, verifyPhoneCode } from '../api/phoneVerification';
+import { saveAuthSession } from '../utils/authStorage';
 
 interface Props {
   onSignup: (name?: string) => void;
@@ -172,9 +173,8 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
         email: form.email,
         password: form.password,
       });
-      const { accessToken, refreshToken, name } = loginResponse.data.data;
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      const { accessToken, refreshToken, name, role } = loginResponse.data.data;
+      saveAuthSession({ accessToken, refreshToken, name, role }, 'local');
       onSignup(name); // 성공 시에만 호출
     } catch (error: unknown) {
       const msg = getErrorMessage(error, '회원가입에 실패했어요');
@@ -193,10 +193,14 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
         phone: form.phone,
       });
       const loginData = response.data?.data;
-      if (loginData?.accessToken) localStorage.setItem('accessToken', loginData.accessToken);
-      if (loginData?.refreshToken) localStorage.setItem('refreshToken', loginData.refreshToken);
-      if (loginData?.role) localStorage.setItem('moida_user_role', loginData.role);
-      if (loginData?.name) localStorage.setItem('moida_user_name', loginData.name);
+      if (loginData?.accessToken) {
+        saveAuthSession({
+          accessToken: loginData.accessToken,
+          refreshToken: loginData.refreshToken,
+          name: loginData.name,
+          role: loginData.role,
+        }, 'local');
+      }
       onComplete?.(loginData?.name);
     } catch (error: unknown) {
       const msg = getErrorMessage(error, '프로필 등록에 실패했어요');

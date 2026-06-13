@@ -7,6 +7,7 @@ import {
   setActiveNotificationClient,
   clearActiveNotificationClient,
 } from './notificationSocket';
+import { getAccessToken } from '../utils/authStorage';
 // 외부(App.tsx, axiosInstance) 에서 명시 종료가 필요하면 './notificationSocket' 의
 // disconnectNotificationSocket 을 직접 import 한다. 본 파일은 컴포넌트만 export 하도록 분리되어 있다.
 
@@ -51,7 +52,7 @@ const NotificationSocketBridge: React.FC<Props> = ({ isAuthenticated, onIncoming
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (!token) return;
 
     const client = new Client({

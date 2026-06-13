@@ -34,25 +34,28 @@ const STATUS_OPTIONS: MyProduct['status'][] = ['승인요청중', '숨김'];
 // 칩에 보여줄 라벨. ('승인요청중' 상태값을 화면에서는 '승인요청'으로 표기)
 const STATUS_LABEL: Partial<Record<MyProduct['status'], string>> = {
   '승인요청중': '승인요청',
+  '보완요청': '승인요청',
   '숨김': '숨김',
 };
 
 // 화면 상태 라벨 → 백엔드 ProductStatus. 매핑이 없는 상태(경매예정/유찰 등)는 변경하지 않는다(undefined).
 const STATUS_TO_API: Partial<Record<MyProduct['status'], 'PENDING' | 'HIDDEN'>> = {
   '승인요청중': 'PENDING',
+  '보완요청': 'PENDING',
   '숨김': 'HIDDEN',
 };
 
 const formatPrice = (v: string) => v.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 const toNumber = (v: string) => Number(v.replace(/[^0-9]/g, '')) || 0;
 
-// 수정이 허용되는 백엔드 상태. (목록 화면의 수정 버튼 노출 조건과 동일: 승인요청중/유찰/숨김)
+// 수정이 허용되는 백엔드 상태. (목록 화면의 수정 버튼 노출 조건과 동일: 승인요청중/보완요청/유찰/숨김)
 // 저장 직전 최신 상태가 이 목록에 없으면 수정을 차단한다.
-const EDITABLE_API_STATUSES = ['PENDING', 'FAILED', 'HIDDEN'] as const;
+const EDITABLE_API_STATUSES = ['PENDING', 'NEEDS_REVISION', 'FAILED', 'HIDDEN'] as const;
 
 // 차단 안내 문구에 쓰는 상태 한글 라벨.
 const STATUS_LABEL_KO: Record<string, string> = {
   SCHEDULED: '경매예정',
+  NEEDS_REVISION: '보완요청',
   LIVE: '경매중',
   SOLD: '낙찰',
   RETURN_REQUESTED: '환수요청',
@@ -77,7 +80,9 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
   const [immediatePrice, setImmediatePrice] = useState('');
   const [description, setDescription] = useState(product.description);
   const [location, setLocation] = useState(product.location);
-  const [status, setStatus] = useState<MyProduct['status']>(product.status);
+  const [status, setStatus] = useState<MyProduct['status']>(
+    product.status === '보완요청' ? '승인요청중' : product.status
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -105,6 +110,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
           minBidUnit: detail.minBidUnit != null ? formatPrice(String(detail.minBidUnit)) : '',
           description: detail.description ?? '',
           location: detail.location,
+          status: product.status === '보완요청' ? '승인요청중' : product.status,
         };
         const immediate = detail.immediatePrice != null ? formatPrice(String(detail.immediatePrice)) : '';
         setImages(full.images);
@@ -117,6 +123,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
         setImmediatePrice(immediate);
         setDescription(full.description);
         setLocation(full.location);
+        setStatus(full.status);
         setBaseline(full);
         setBaselineImmediatePrice(immediate);
       } catch (error) {
@@ -137,7 +144,6 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
     minBidUnit !== baseline.minBidUnit ||
     immediatePrice !== baselineImmediatePrice ||
     description !== baseline.description ||
-    location !== baseline.location ||
     status !== baseline.status;
 
   const handleBack = () => {
@@ -199,7 +205,6 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
       }
     }
     if (!description.trim()) e.description = '상품 설명을 입력해주세요';
-    if (!location.trim()) e.location = '거래 희망 지역을 입력해주세요';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -209,7 +214,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
     setLoading(true);
     try {
       // 저장 직전 최신 상태 확인: 수정 화면을 열어둔 사이 수정 불가 상태(경매예정/경매중/낙찰 등)로
-      // 전환됐다면 수정 차단. 허용 상태(승인요청중/유찰/숨김)가 아니면 모두 막는다.
+      // 전환됐다면 수정 차단. 허용 상태(승인요청중/보완요청/유찰/숨김)가 아니면 모두 막는다.
       const latest = await getProduct(product.id);
       if (latest.status && !EDITABLE_API_STATUSES.includes(latest.status as typeof EDITABLE_API_STATUSES[number])) {
         const label = STATUS_LABEL_KO[latest.status] ?? '현재';
@@ -382,15 +387,6 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
             {errors.description && <p className={styles.fieldError}>{errors.description}</p>}
           </div>
 
-          {/* 거래 희망 지역 */}
-          <div className={styles.section}>
-            <label className={styles.sectionTitle}>거래 희망 지역 <span className={styles.required}>*</span></label>
-            <input className={`${styles.input} ${errors.location ? styles.inputError : ''}`}
-              placeholder="예) 강남구 역삼동" value={location}
-              onChange={e => { setLocation(e.target.value); setErrors(p => ({ ...p, location: '' })); }}/>
-            {errors.location && <p className={styles.fieldError}>{errors.location}</p>}
-          </div>
-
         </div>
       </div>
 
@@ -414,7 +410,7 @@ const EditProductPage: React.FC<Props> = ({ product, onBack, onSaved, onDirtyCha
 
     {showPreview && (
       <ProductPreviewModal
-        data={{ images, mainImageIndex, title, category, condition, auctionStartPrice, minBidUnit, description, location }}
+        data={{ images, mainImageIndex, title, category, condition, auctionStartPrice, minBidUnit, description }}
         onClose={() => setShowPreview(false)}
       />
     )}

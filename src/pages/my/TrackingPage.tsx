@@ -7,6 +7,10 @@ import { CARRIERS } from '../../data/carriers';
 
 interface Props {
   onBack: () => void;
+  initialCarrier?: string;
+  initialTrackingNo?: string;
+  initialStatus?: string;
+  initialProduct?: string;
 }
 
 type StepStatus = 'done' | 'active' | 'pending';
@@ -43,10 +47,63 @@ const toResult = (dto: TrackingDto): TrackingResult => ({
   })),
 });
 
-const TrackingPage: React.FC<Props> = ({ onBack }) => {
-  const [carrier, setCarrier] = useState('');
-  const [trackingNo, setTrackingNo] = useState('');
-  const [result, setResult] = useState<TrackingResult | null>(null);
+const DEMO_STEPS = [
+  { status: '배송완료', location: '서울 강남 배송완료센터' },
+  { status: '배송중', location: '서울 강남 배송지점' },
+  { status: '간선하차', location: '곤지암 허브' },
+  { status: '상품 발송', location: 'MOIDA 물류센터' },
+  { status: '결제 확인', location: 'MOIDA 안전거래' },
+];
+
+const DEMO_LEVEL_BY_STATUS: Record<string, number> = {
+  PAYMENT_COMPLETED: 1,
+  SHIPMENT_NOTICE: 2,
+  SHIPPING: 4,
+  DELIVERED: 5,
+  RECEIVED: 5,
+};
+
+const buildDemoResult = (
+  carrierCode: string,
+  invoice: string,
+  status = 'SHIPPING',
+  product = '낙찰 상품',
+): TrackingResult => {
+  const carrierName = CARRIERS.find((item) => item.code === carrierCode)?.name ?? 'CJ대한통운';
+  const level = DEMO_LEVEL_BY_STATUS[status] ?? DEMO_LEVEL_BY_STATUS.SHIPPING;
+  const visibleSteps = DEMO_STEPS.slice(DEMO_STEPS.length - level).reverse();
+  const complete = status === 'DELIVERED' || status === 'RECEIVED';
+  const currentStatus = complete
+    ? '배송 완료'
+    : status === 'SHIPMENT_NOTICE'
+      ? '발송알림'
+      : status === 'PAYMENT_COMPLETED'
+        ? '결제완료'
+        : '배송 중';
+
+  return {
+    carrier: carrierName,
+    trackingNo: invoice,
+    product,
+    currentStatus,
+    estimatedDate: complete ? '배송이 완료되었습니다' : '배송 단계가 업데이트되었습니다',
+    steps: visibleSteps.map((step, index) => ({
+      time: `2026.06.${String(13 - index).padStart(2, '0')} ${String(15 - index).padStart(2, '0')}:00`,
+      location: step.location,
+      status: step.status,
+      stepStatus: complete ? 'done' : index === 0 ? 'active' : 'done',
+    })),
+  };
+};
+
+const TrackingPage: React.FC<Props> = ({ onBack, initialCarrier, initialTrackingNo, initialStatus, initialProduct }) => {
+  const [carrier, setCarrier] = useState(initialCarrier ?? '');
+  const [trackingNo, setTrackingNo] = useState(initialTrackingNo ?? '');
+  const [result, setResult] = useState<TrackingResult | null>(
+    initialCarrier && initialTrackingNo && initialStatus
+      ? buildDemoResult(initialCarrier, initialTrackingNo, initialStatus, initialProduct)
+      : null
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -149,6 +206,11 @@ const TrackingPage: React.FC<Props> = ({ onBack }) => {
 
             {/* 정보 요약 */}
             <div className={tStyles.infoCard}>
+              <div className={tStyles.infoRow}>
+                <span className={tStyles.infoLabel}>상품</span>
+                <span className={tStyles.infoValue}>{result.product}</span>
+              </div>
+              <div className={tStyles.infoDivider}/>
               <div className={tStyles.infoRow}>
                 <span className={tStyles.infoLabel}>택배사</span>
                 <span className={tStyles.infoValue}>{result.carrier}</span>

@@ -8,6 +8,7 @@ import editStyles from './MyProductsPage.module.css';
 const TABS = [
   '전체',
   '승인요청중',
+  '보완요청',
   '경매예정',
   '경매중',
   '낙찰자 결제대기',
@@ -35,6 +36,7 @@ interface Props {
 const PRODUCT_STATUS_LABELS: Record<NonNullable<ProductSummaryDto['status']>, EditableStatus | '삭제'> = {
   SCHEDULED: '경매예정',
   PENDING: '승인요청중',
+  NEEDS_REVISION: '보완요청',
   LIVE: '경매중',
   SOLD: '낙찰',
   FAILED: '유찰',
@@ -71,6 +73,11 @@ const toStatusLabel = (item: ProductSummaryDto): ProductStatusLabel => {
 const statusDescription = (item: ProductSummaryDto, status: ProductStatusLabel) => {
   if (status === '낙찰자 결제대기') {
     return `낙찰자가 결제기한 내 결제하면 배송 단계가 시작됩니다.${item.paymentDeadline ? ` 기한: ${item.paymentDeadline}` : ''}`;
+  }
+  if (status === '보완요청') {
+    return item.reviewRevisionReason
+      ? `검수 보완 사유: ${item.reviewRevisionReason}`
+      : '검수 보완이 필요합니다. 상품 정보를 수정한 뒤 다시 승인요청해주세요.';
   }
   if (status === '결제완료') return '구매자 결제가 완료되어 배송 안내를 준비 중입니다.';
   if (status === '발송알림') return '구매자에게 발송 알림이 전달되었습니다.';
@@ -149,6 +156,7 @@ const MyProductsPage: React.FC<Props> = ({ onBack, onEdit }) => {
   const statusColor = (status: ProductStatusLabel) => {
     if (status === '경매예정') return styles.statusOn;
     if (status === '승인요청중') return styles.statusApproving;
+    if (status === '보완요청') return styles.statusBid;
     if (status === '경매중') return styles.statusAuctioning;
     if (status === '낙찰자 결제대기') return styles.statusBid;
     if (['결제완료', '발송알림', '배송중', '수령확인 대기'].includes(status)) return styles.statusOn;
@@ -165,7 +173,7 @@ const MyProductsPage: React.FC<Props> = ({ onBack, onEdit }) => {
   );
 
   const canEdit = (status: ProductStatusLabel) => (
-    status === '승인요청중' || status === '유찰' || status === '숨김'
+    status === '승인요청중' || status === '보완요청' || status === '유찰' || status === '숨김'
   );
 
   // 돌려받기 버튼 클릭 → 사유 입력 모달 오픈

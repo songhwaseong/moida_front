@@ -6,6 +6,7 @@ import {
   type NotificationCategory,
   type NotificationDto,
 } from '../api/notifications';
+import { subscribeToIncomingNotifications } from '../components/notificationEvents';
 import styles from './NotificationPage.module.css';
 
 const CATEGORY_META: Record<NotificationCategory, { label: string; icon: string; color: string }> = {
@@ -17,9 +18,32 @@ const CATEGORY_META: Record<NotificationCategory, { label: string; icon: string;
   SYSTEM: { label: '안내', icon: 'S', color: '#F0F1F4' },
 };
 
+const isWalletDepositApprovalNotification = (notification: NotificationDto) => {
+  const text = `${notification.type} ${notification.title} ${notification.content}`.toLowerCase();
+  return (
+    text.includes('wallet_deposit') ||
+    text.includes('deposit_confirm') ||
+    text.includes('deposit_approved') ||
+    text.includes('입금 승인') ||
+    text.includes('입금 확인') ||
+    text.includes('입금 완료') ||
+    text.includes('충전 승인') ||
+    text.includes('충전 완료') ||
+    text.includes('잔액에 반영') ||
+    /입금.*(승인|확인|완료|반영)/.test(text) ||
+    /충전.*(승인|확인|완료|반영)/.test(text)
+  );
+};
+
+const getNotificationContent = (notification: NotificationDto) => (
+  isWalletDepositApprovalNotification(notification)
+    ? '입금이 승인되어 잔액에 반영되었습니다. 내 계좌에서 거래 내역을 확인해보세요.'
+    : notification.content
+);
+
 interface Props {
   onUnreadCountChange?: () => void;
-  onNavigateLink?: (linkUrl: string) => void;
+  onNavigateLink?: (linkUrl: string, notification: NotificationDto) => void;
 }
 
 const NotificationPage: React.FC<Props> = ({ onUnreadCountChange, onNavigateLink }) => {
@@ -53,6 +77,20 @@ const NotificationPage: React.FC<Props> = ({ onUnreadCountChange, onNavigateLink
     void loadNotifications();
 
     return () => { ignore = true; };
+  }, []);
+
+  useEffect(() => {
+    // 실시간 STOMP 푸시를 목록 맨 앞에 즉시 추가합니다.
+    // 같은 알림이 초기 로드/재방문과 겹칠 수 있어 id 로 중복을 막습니다.
+    const unsubscribe = subscribeToIncomingNotifications((incoming) => {
+      setNotifications((prev) => (
+        prev.some((notification) => notification.id === incoming.id)
+          ? prev
+          : [incoming, ...prev]
+      ));
+    });
+
+    return unsubscribe;
   }, []);
 
   const markOne = async (notificationId: number) => {
@@ -97,9 +135,7 @@ const NotificationPage: React.FC<Props> = ({ onUnreadCountChange, onNavigateLink
 
   const handleNotificationClick = async (notification: NotificationDto) => {
     await markOne(notification.id);
-    if (notification.linkUrl) {
-      onNavigateLink?.(notification.linkUrl);
-    }
+    onNavigateLink?.(notification.linkUrl ?? '', notification);
   };
 
   return (
@@ -123,6 +159,7 @@ const NotificationPage: React.FC<Props> = ({ onUnreadCountChange, onNavigateLink
       <div className={styles.list}>
         {notifications.map((notification) => {
           const meta = CATEGORY_META[notification.category] ?? CATEGORY_META.SYSTEM;
+          const content = getNotificationContent(notification);
 
           return (
             <button
@@ -139,7 +176,7 @@ const NotificationPage: React.FC<Props> = ({ onUnreadCountChange, onNavigateLink
                   <span className={styles.itemTitle}>{notification.title}</span>
                   <span className={styles.time}>{notification.createdAt ?? ''}</span>
                 </div>
-                <p className={styles.body}>{notification.content}</p>
+                <p className={styles.body}>{content}</p>
                 <span className={styles.categoryLabel}>{meta.label}</span>
               </div>
               {!notification.read ? <div className={styles.dot} /> : null}

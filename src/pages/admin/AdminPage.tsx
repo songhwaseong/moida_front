@@ -28,10 +28,11 @@ import AuctionManagePage from './AuctionManagePage';
 import type { IdleMinutes } from './adminSettingsOptions';
 import TrackingModal from '../../components/TrackingModal';
 import { useAdminDialog } from './useAdminDialog';
+import { getAdminUiItem, getUserRole } from '../../utils/authStorage';
 import styles from './AdminPage.module.css';
 
 // ─── 관리자용 통합 상품 타입 ───────────────────────────────────────────
-type TradeStatus = '경매예정' | '승인요청중' | '낙찰' | '환수요청' | '반송중' | '환수완료' | '숨김';
+type TradeStatus = '경매예정' | '승인요청중' | '보완요청' | '낙찰' | '환수요청' | '반송중' | '환수완료' | '숨김';
 type AuctionStatus = '경매중' | '낙찰' | '유찰' | '환수요청' | '반송중' | '환수완료' | '숨김';
 type ProductStatus = TradeStatus | AuctionStatus;
 
@@ -53,6 +54,8 @@ interface AdminProduct {
   trackingNo: string | null;
   returnRequestReason: string | null;
   returnRequestedAt: string | null;
+  reviewRevisionReason: string | null;
+  reviewRevisionRequestedAt: string | null;
 }
 
 // ─── 사이드바 메뉴 구조 ─────────────────────────────────────────────────
@@ -163,8 +166,8 @@ const SIDE_SECTIONS: { sectionKey: string; items: { key: MenuKey; labelKey: stri
 ];
 
 const CATEGORY_OPTIONS = ['전체', '디지털/가전', '패션/의류', '명품', '시계/주얼리', '신발', '스포츠/레저', '뷰티/미용', '게임/취미', '음향/악기', '한정판'];
-const PRODUCT_STATUS_OPTIONS: ProductStatus[] = ['경매예정', '승인요청중', '경매중', '낙찰', '유찰', '환수요청', '반송중', '환수완료', '숨김'];
-const MANAGE_STATUS_OPTIONS: ProductStatus[] = ['경매예정', '승인요청중', '경매중', '환수요청', '반송중', '환수완료', '숨김'];
+const PRODUCT_STATUS_OPTIONS: ProductStatus[] = ['경매예정', '승인요청중', '보완요청', '경매중', '낙찰', '유찰', '환수요청', '반송중', '환수완료', '숨김'];
+const MANAGE_STATUS_OPTIONS: ProductStatus[] = ['경매예정', '승인요청중', '보완요청', '경매중', '환수요청', '반송중', '환수완료', '숨김'];
 
 
 // ─── AdminPage ─────────────────────────────────────────────────────────
@@ -179,7 +182,7 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal, idleMinutes, o
   const adminDialog = useAdminDialog();
   const t = useT();
   // ADMIN 전용 메뉴(접속 기록) 노출 판별. MANAGER 는 제외.
-  const isAdminRole = localStorage.getItem('moida_user_role') === 'ADMIN';
+  const isAdminRole = getUserRole() === 'ADMIN';
   const [activeMenu, setActiveMenu] = useState<MenuKey>('대시보드');
   // 사이드바 "상품 문의" 배지용 미답변 건수. 관리자 로그인 직후/주기적으로 가볍게 갱신한다.
   const [pendingInquiryCount, setPendingInquiryCount] = useState(0);
@@ -225,6 +228,8 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal, idleMinutes, o
         trackingNo: dto.trackingNo,
         returnRequestReason: dto.returnRequestReason,
         returnRequestedAt: dto.returnRequestedAt,
+        reviewRevisionReason: dto.reviewRevisionReason,
+        reviewRevisionRequestedAt: dto.reviewRevisionRequestedAt,
       })));
     } catch {
       setLoadError('상품 목록을 불러오지 못했습니다.');
@@ -238,7 +243,7 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal, idleMinutes, o
 
   // ─── 로그인 시각 ──────────────────────────────────────────────────
   const loginAt = (() => {
-    const raw = localStorage.getItem('moida_admin_login_at');
+    const raw = getAdminUiItem('moida_admin_login_at');
     if (!raw) return '';
     const d = new Date(raw);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -350,6 +355,7 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal, idleMinutes, o
     auction: baseFiltered.filter(p => p.type === '경매').length,
     selling: baseFiltered.filter(p => p.status === '경매예정').length,
     approving: baseFiltered.filter(p => p.status === '승인요청중').length,
+    revisionRequested: baseFiltered.filter(p => p.status === '보완요청').length,
     inBid: baseFiltered.filter(p => p.status === '경매중').length,
     won: baseFiltered.filter(p => p.status === '낙찰').length,
     failed: baseFiltered.filter(p => p.status === '유찰').length,
@@ -424,6 +430,7 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal, idleMinutes, o
           { key: null, labelKey: 'admin.products.stats.total', value: stats.total },
           { key: '경매예정', labelKey: 'admin.products.stats.scheduled', value: stats.selling },
           { key: '승인요청중', labelKey: 'admin.products.stats.pending', value: stats.approving },
+          { key: '보완요청', label: '보완요청', value: stats.revisionRequested },
           { key: '경매중', labelKey: 'admin.products.stats.live', value: stats.inBid },
           { key: '환수요청', label: '환수요청', value: stats.returnRequested },
           { key: '반송중', label: '반송중', value: stats.returnShipping },
@@ -941,6 +948,29 @@ const AdminPage: React.FC<Props> = ({ onLogout, onSwitchToNormal, idleMinutes, o
                       <span className={styles.detailInfoLabel}>요청 사유</span>
                       <p style={{ margin: '6px 0 0', fontSize: 13.5, lineHeight: 1.7, color: '#333', whiteSpace: 'pre-wrap' }}>
                         {detailProduct.returnRequestReason?.trim() || '-'}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {(detailProduct.reviewRevisionReason || detailProduct.reviewRevisionRequestedAt || detailProduct.status === '보완요청') && (
+                  <>
+                    <div className={styles.detailDivider}/>
+                    <p className={styles.detailSectionTitle}>보완 요청 정보</p>
+                    <div className={styles.detailInfoGrid}>
+                      <div className={styles.detailInfoItem}>
+                        <span className={styles.detailInfoLabel}>요청일</span>
+                        <span className={styles.detailInfoValue}>{detailProduct.reviewRevisionRequestedAt ?? '-'}</span>
+                      </div>
+                      <div className={styles.detailInfoItem}>
+                        <span className={styles.detailInfoLabel}>진행 상태</span>
+                        <span className={styles.detailInfoValue}>{detailProduct.status}</span>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 10 }}>
+                      <span className={styles.detailInfoLabel}>보완 사유</span>
+                      <p style={{ margin: '6px 0 0', fontSize: 13.5, lineHeight: 1.7, color: '#333', whiteSpace: 'pre-wrap' }}>
+                        {detailProduct.reviewRevisionReason?.trim() || '-'}
                       </p>
                     </div>
                   </>
