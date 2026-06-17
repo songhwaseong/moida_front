@@ -290,7 +290,7 @@ const HomePage: React.FC<Props> = ({
 
       {!selectedCategory && (
         <Banner
-          title="오늘의 핫딜 경매<br/>지금 바로 참여하세요"
+          title={"오늘의 핫딜 경매\n지금 바로 참여하세요"}
           subtitle="최대 90% 할인된 가격으로"
           cta="참여하기"
           onClick={onMoreAuction}
