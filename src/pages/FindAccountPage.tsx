@@ -121,7 +121,7 @@ const FindAccountPage: React.FC<Props> = ({ onBack, initialTab = 'id' }) => {
     }
     setIdVerifyingCode(true);
     try {
-      await verifyPhoneCode(idPhone.trim(), idCode);
+      await verifyPhoneCode(idPhone.trim(), idCode, 'FIND_ID');
       setIdPhoneVerified(true);
       setIdCodeTimer(0);
       setIdCodeMsg('휴대폰 인증이 완료됐어요 ✓');
@@ -173,7 +173,7 @@ const FindAccountPage: React.FC<Props> = ({ onBack, initialTab = 'id' }) => {
     }
     setPwLoading(true);
     try {
-      await sendEmailCode(pwEmail);
+      await sendEmailCode(pwEmail, 'RESET_PASSWORD');
       setPwStep('verify');
       startTimer();
     } catch (error: unknown) {
@@ -189,7 +189,7 @@ const FindAccountPage: React.FC<Props> = ({ onBack, initialTab = 'id' }) => {
     if (pwCode.length !== 6) { setPwError('인증코드 6자리를 입력해주세요'); return; }
     setPwLoading(true);
     try {
-      await verifyEmailCode(pwEmail, pwCode);
+      await verifyEmailCode(pwEmail, pwCode, 'RESET_PASSWORD');
       setPwStep('reset');
     } catch (error: unknown) {
       setPwError(getErrorMessage(error, '인증코드가 올바르지 않아요'));

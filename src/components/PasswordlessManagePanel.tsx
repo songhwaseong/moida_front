@@ -203,7 +203,7 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
       if (!email.trim()) throw new Error('이메일을 입력해주세요.');
       if (!EMAIL_PATTERN.test(email)) throw new Error('이메일 형식이 올바르지 않아요.');
 
-      await sendEmailCode(email.trim());
+      await sendEmailCode(email.trim(), 'PASSWORDLESS_WITHDRAW');
       setCodeSent(true);
       setStatus('인증 코드를 이메일로 보냈어요. 5분 이내에 입력해주세요.');
     } catch (err: unknown) {
@@ -223,7 +223,7 @@ const PasswordlessManagePanel: React.FC<Props> = ({ onBack }) => {
     try {
       if (!emailCode.trim()) throw new Error('인증 코드를 입력해주세요.');
 
-      await verifyEmailCode(email.trim(), emailCode.trim());
+      await verifyEmailCode(email.trim(), emailCode.trim(), 'PASSWORDLESS_WITHDRAW');
       await withdrawPasswordlessByEmail(email.trim());
       setAccessToken('');
       setRegistration(null);

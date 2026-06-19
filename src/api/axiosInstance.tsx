@@ -13,11 +13,15 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "../config/config";
 import { disconnectNotificationSocket } from "../components/notificationSocket";
-import { clearAuthSession, getAccessToken, getRefreshToken, updateStoredTokens } from "../utils/authStorage";
+import { clearAuthSession, getAccessToken, updateStoredTokens } from "../utils/authStorage";
 
 // withCredentials: true 항목은 세션 방식 설정이므로 jwt를 사용하면 삭제하도록 합니다.
 const axiosInstance = axios.create({
-    baseURL: API_BASE_URL
+    baseURL: API_BASE_URL,
+    withCredentials: true,
+    withXSRFToken: true,
+    xsrfCookieName: "XSRF-TOKEN",
+    xsrfHeaderName: "X-XSRF-TOKEN",
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -29,21 +33,29 @@ const axiosInstance = axios.create({
 let refreshInFlight: Promise<string | null> | null = null;
 
 const refreshTokens = async (): Promise<string | null> => {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) return null;
-
     try {
         // axiosInstance 의 인터셉터 무한 재진입을 피하기 위해 raw axios 로 호출한다.
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-        const data = response.data?.data as { accessToken?: string; refreshToken?: string } | undefined;
+        const response = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            {},
+            {
+                withCredentials: true,
+                withXSRFToken: true,
+                xsrfCookieName: "XSRF-TOKEN",
+                xsrfHeaderName: "X-XSRF-TOKEN",
+            },
+        );
+        const data = response.data?.data as { accessToken?: string } | undefined;
         if (!data?.accessToken) return null;
 
-        updateStoredTokens(data.accessToken, data.refreshToken);
+        updateStoredTokens(data.accessToken);
         return data.accessToken;
     } catch {
         return null;
     }
 };
+
+export const restoreAuthSession = async (): Promise<boolean> => Boolean(await refreshTokens());
 
 const triggerHardLogout = () => {
     // STOMP 알림 소켓도 함께 끊는다.
@@ -68,7 +80,9 @@ axiosInstance.interceptors.request.use(
         const token = getAccessToken();
         // 로그인/회원가입/소셜로그인 등 auth 엔드포인트에는 토큰을 붙이지 않는다 (이미 비로그인 상태).
         // 단 complete-social-profile 은 토큰이 필요한 후처리이므로 예외 처리.
-        const isAuthRequest = config.url?.includes("/auth/") && !config.url?.includes("complete-social-profile");
+        const isAuthRequest = config.url?.includes("/auth/")
+            && !config.url?.includes("complete-social-profile")
+            && !config.url?.includes("ws-ticket");
 
         if (token && !isAuthRequest) {
             config.headers = config.headers || {};

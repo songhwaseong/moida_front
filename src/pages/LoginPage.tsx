@@ -21,7 +21,7 @@ import {
 } from '../config/config';
 import type { LoginResponse } from '../types';
 import { isAdminRole, saveAuthSession } from '../utils/authStorage';
-import { createOAuthState } from '../utils/oauthState';
+import { prepareOAuth } from '../utils/oauthState';
 
 interface Props {
   onLogin: (name?: string) => void;
@@ -78,7 +78,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
     const adminLogin = isAdminRole(login.role);
     saveAuthSession({
       accessToken: login.accessToken,
-      refreshToken: login.refreshToken,
       name: login.name,
       role: login.role,
     }, adminLogin ? 'session' : 'local');
@@ -244,21 +243,21 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
     }
   };
 
-  const handleKakaoLogin = () => {
-    const state = createOAuthState('kakao');
+  const handleKakaoLogin = async () => {
+    const { state } = await prepareOAuth('kakao');
     const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${KKO_CLIENT_ID}&redirect_uri=${KKO_REDIRECT_URI}&state=${state}`;
     window.location.href = url;
   };
 
-  const handleNaverLogin = () => {
-    const state = createOAuthState('naver');
+  const handleNaverLogin = async () => {
+    const { state } = await prepareOAuth('naver');
     const url = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAV_CLIENT_ID}&redirect_uri=${NAV_REDIRECT_URI}&state=${state}`;
     window.location.href = url;
   };
 
-  const handleGoogleLogin = () => {
-    const state = createOAuthState('google');
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&scope=email profile&state=${state}`;
+  const handleGoogleLogin = async () => {
+    const { state, codeChallenge } = await prepareOAuth('google');
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&scope=email profile&state=${state}&code_challenge=${encodeURIComponent(codeChallenge ?? '')}&code_challenge_method=S256`;
     window.location.href = url;
   };
 

@@ -17,10 +17,9 @@ import { getAccessToken } from '../utils/authStorage';
 // 계속 진행되어야 하므로 예외를 삼킨다.
 export const logout = async (): Promise<void> => {
   const token = getAccessToken();
-  if (!token) return; // 토큰이 없으면 서버가 회원을 식별할 수 없어 호출 의미가 없다.
   try {
     await customAxios.post('/auth/logout', null, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   } catch {
     // 무시: 로컬 로그아웃 흐름을 막지 않는다.

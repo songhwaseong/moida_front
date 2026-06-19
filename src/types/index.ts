@@ -24,7 +24,6 @@ export interface BidHistory {
 
 export interface LoginResponse {
   accessToken: string;
-  refreshToken: string;
   id: number;
   name: string;
   email: string;

@@ -7,12 +7,14 @@ interface ApiResponse<T> {
     errorCode?: string;
 }
 
-export const sendEmailCode = async (email: string) => {
-    await customAxios.post<ApiResponse<null>>('/auth/email/send-code', { email });
+export type EmailVerificationPurpose = 'RESET_PASSWORD' | 'PASSWORDLESS_WITHDRAW';
+
+export const sendEmailCode = async (email: string, purpose: EmailVerificationPurpose) => {
+    await customAxios.post<ApiResponse<null>>('/auth/email/send-code', { email, purpose });
 };
 
-export const verifyEmailCode = async (email: string, code: string) => {
-    await customAxios.post<ApiResponse<null>>('/auth/email/verify-code', { email, code });
+export const verifyEmailCode = async (email: string, code: string, purpose: EmailVerificationPurpose) => {
+    await customAxios.post<ApiResponse<null>>('/auth/email/verify-code', { email, code, purpose });
 };
 
 export const resetPassword = async (email: string, newPassword: string) => {

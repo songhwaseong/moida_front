@@ -8,6 +8,7 @@ import {
   clearActiveNotificationClient,
 } from './notificationSocket';
 import { getAccessToken } from '../utils/authStorage';
+import { issueWebSocketTicket } from '../api/webSocketTicket';
 // 외부(App.tsx, axiosInstance) 에서 명시 종료가 필요하면 './notificationSocket' 의
 // disconnectNotificationSocket 을 직접 import 한다. 본 파일은 컴포넌트만 export 하도록 분리되어 있다.
 
@@ -28,12 +29,12 @@ interface Props {
 
 const WS_RECONNECT_DELAY_MS = 3000;
 
-const getWebSocketUrl = (token: string) => {
+const getWebSocketUrl = (ticket: string) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   // 핸드셰이크(HTTP 업그레이드) 단계에서 서버가 Principal 을 세팅할 수 있도록 토큰을 쿼리파라미터로 전달한다.
   // (개인 알림 user-destination 이 동작하려면 session.getPrincipal() 이 있어야 하고,
   //  핸드셰이크는 STOMP connectHeaders 를 볼 수 없으므로 URL 로 넘긴다.)
-  return `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+  return `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
 };
 
 /**
@@ -56,10 +57,10 @@ const NotificationSocketBridge: React.FC<Props> = ({ isAuthenticated, onIncoming
     if (!token) return;
 
     const client = new Client({
-      brokerURL: getWebSocketUrl(token),
-      // WebSocketAuthChannelInterceptor 가 CONNECT 프레임의 Authorization 헤더에서 JWT 를 읽는다.
-      connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: WS_RECONNECT_DELAY_MS,
+      beforeConnect: async () => {
+        client.brokerURL = getWebSocketUrl(await issueWebSocketTicket());
+      },
       onConnect: () => {
         // /user/queue/notifications 는 SimpMessagingTemplate.convertAndSendToUser(...) 의 라우팅 결과.
         // STOMP Principal.getName()(=이메일) 기준으로 본인에게만 도달한다.

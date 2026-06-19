@@ -8,6 +8,7 @@ import {
 } from '../api/chat';
 import styles from './ProductLiveChat.module.css';
 import { getAccessToken } from '../utils/authStorage';
+import { issueWebSocketTicket } from '../api/webSocketTicket';
 
 interface Props {
   productId: number;
@@ -19,9 +20,9 @@ interface Props {
 const WS_RECONNECT_DELAY_MS = 3000;
 const SEND_COOLDOWN_MS = 2000;
 
-const getWebSocketUrl = () => {
+const getWebSocketUrl = (ticket: string) => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws`;
+  return `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
 };
 
 // 서버가 모든 구독자에게 같은 메시지를 보내므로, 현재 사용자의 JWT subject와
@@ -95,11 +96,12 @@ const ProductLiveChat: React.FC<Props> = ({
   }, [loadMessages]);
 
   useEffect(() => {
-    const token = getAccessToken();
+    if (!isLoggedIn || !getAccessToken()) return;
     const client = new Client({
-      brokerURL: getWebSocketUrl(),
-      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
       reconnectDelay: WS_RECONNECT_DELAY_MS,
+      beforeConnect: async () => {
+        client.brokerURL = getWebSocketUrl(await issueWebSocketTicket());
+      },
       onConnect: () => {
         // 상품 상세마다 하나의 공개 채팅 토픽을 사용하고,
         // 해당 상품을 보고 있는 사용자들이 같은 토픽을 구독한다.
@@ -130,7 +132,7 @@ const ProductLiveChat: React.FC<Props> = ({
       stompClientRef.current = null;
       void client.deactivate();
     };
-  }, [appendMessage, productId]);
+  }, [appendMessage, isLoggedIn, productId]);
 
   useEffect(() => {
     // 메시지 영역 내부 스크롤만 아래로 이동시켜,

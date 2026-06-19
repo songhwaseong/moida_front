@@ -176,7 +176,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     setLoading(true);
     setErrors(p => ({ ...p, phone: '', code: '' }));
     try {
-      await sendPhoneCode(phone.trim());
+      await sendPhoneCode(phone.trim(), 'SELLER_PHONE');
       setCodeSent(true);
       setPhoneVerified(false);
       setInputCode('');
@@ -197,7 +197,7 @@ const SellPage: React.FC<Props> = ({ onBack, onSubmit, onDirtyChange }) => {
     setLoading(true);
     setErrors(p => ({ ...p, code: '' }));
     try {
-      await verifyPhoneCode(phone.trim(), inputCode.trim());
+      await verifyPhoneCode(phone.trim(), inputCode.trim(), 'SELLER_PHONE');
       setPhoneVerified(true);
       setCodeTimer(0);
       setErrors(p => ({ ...p, code: '' }));

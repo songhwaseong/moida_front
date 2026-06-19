@@ -1,8 +1,6 @@
 export type AuthStorageMode = 'local' | 'session';
 
 export const AUTH_STORAGE_KEYS = [
-  'accessToken',
-  'refreshToken',
   'moida_logged_in',
   'moida_user_name',
   'moida_user_role',
@@ -14,8 +12,12 @@ export const ADMIN_UI_STORAGE_KEYS = [
   'moida_admin_idle_warned',
 ] as const;
 
+const LEGACY_TOKEN_KEYS = ['accessToken', 'refreshToken'] as const;
+
 type AuthStorageKey = typeof AUTH_STORAGE_KEYS[number];
 type AdminUiStorageKey = typeof ADMIN_UI_STORAGE_KEYS[number];
+
+let accessTokenMemory: string | null = null;
 
 const storageFor = (mode: AuthStorageMode): Storage => (
   mode === 'session' ? sessionStorage : localStorage
@@ -35,48 +37,45 @@ const writeToMode = (key: string, value: string, mode: AuthStorageMode) => {
   otherStorageFor(mode).removeItem(key);
 };
 
+LEGACY_TOKEN_KEYS.forEach(removeFromBoth);
+
 export const isAdminRole = (role?: string | null): boolean => role === 'ADMIN' || role === 'MANAGER';
 
 const hasSessionAuthItem = (): boolean => (
   AUTH_STORAGE_KEYS.some(key => sessionStorage.getItem(key) !== null)
 );
 
-const hasLegacyPersistentAdminAuth = (): boolean => (
-  !hasSessionAuthItem() && isAdminRole(localStorage.getItem('moida_user_role'))
-);
-
 const getStoredItem = (key: AuthStorageKey): string | null => (
-  hasLegacyPersistentAdminAuth()
-    ? sessionStorage.getItem(key)
-    : sessionStorage.getItem(key) ?? localStorage.getItem(key)
+  sessionStorage.getItem(key) ?? localStorage.getItem(key)
 );
 
 const getStoredAdminUiItem = (key: AdminUiStorageKey): string | null => (
   sessionStorage.getItem(key) ?? localStorage.getItem(key)
 );
 
-export const getAccessToken = (): string | null => getStoredItem('accessToken');
+export const getAccessToken = (): string | null => accessTokenMemory;
 
-export const getRefreshToken = (): string | null => getStoredItem('refreshToken');
+export const setAccessToken = (accessToken: string | null) => {
+  accessTokenMemory = accessToken;
+};
 
 export const getUserRole = (): string | null => getStoredItem('moida_user_role');
 
 export const getLoggedInUserName = (): string => getStoredItem('moida_user_name') ?? '';
 
-export const hasAuthSession = (): boolean => (
-  getStoredItem('moida_logged_in') === 'true' && Boolean(getAccessToken())
-);
+export const hasPersistedAuthHint = (): boolean => getStoredItem('moida_logged_in') === 'true';
+
+export const hasAuthSession = (): boolean => hasPersistedAuthHint() && Boolean(accessTokenMemory);
 
 export const hasAdminAuthSession = (): boolean => hasAuthSession() && isAdminRole(getUserRole());
 
-export const getCurrentAuthStorageMode = (): AuthStorageMode => {
-  return hasSessionAuthItem() ? 'session' : 'local';
-};
+export const getCurrentAuthStorageMode = (): AuthStorageMode => (
+  hasSessionAuthItem() ? 'session' : 'local'
+);
 
 export const saveAuthSession = (
   session: {
     accessToken?: string | null;
-    refreshToken?: string | null;
     name?: string | null;
     role?: string | null;
     loggedIn?: boolean;
@@ -85,18 +84,17 @@ export const saveAuthSession = (
 ) => {
   AUTH_STORAGE_KEYS.forEach(removeFromBoth);
   ADMIN_UI_STORAGE_KEYS.forEach(removeFromBoth);
+  LEGACY_TOKEN_KEYS.forEach(removeFromBoth);
 
-  if (session.accessToken) writeToMode('accessToken', session.accessToken, mode);
-  if (session.refreshToken) writeToMode('refreshToken', session.refreshToken, mode);
+  accessTokenMemory = session.accessToken ?? null;
   if (session.loggedIn !== false) writeToMode('moida_logged_in', 'true', mode);
   if (session.name) writeToMode('moida_user_name', session.name, mode);
   if (session.role) writeToMode('moida_user_role', session.role, mode);
 };
 
-export const updateStoredTokens = (accessToken: string, refreshToken?: string | null) => {
-  const mode = getCurrentAuthStorageMode();
-  writeToMode('accessToken', accessToken, mode);
-  if (refreshToken) writeToMode('refreshToken', refreshToken, mode);
+export const updateStoredTokens = (accessToken: string) => {
+  accessTokenMemory = accessToken;
+  LEGACY_TOKEN_KEYS.forEach(removeFromBoth);
 };
 
 export const setStoredLoginUser = (name: string, mode: AuthStorageMode = 'local') => {
@@ -105,8 +103,10 @@ export const setStoredLoginUser = (name: string, mode: AuthStorageMode = 'local'
 };
 
 export const clearAuthSession = () => {
+  accessTokenMemory = null;
   AUTH_STORAGE_KEYS.forEach(removeFromBoth);
   ADMIN_UI_STORAGE_KEYS.forEach(removeFromBoth);
+  LEGACY_TOKEN_KEYS.forEach(removeFromBoth);
 };
 
 export const getAdminUiItem = (key: AdminUiStorageKey): string | null => (

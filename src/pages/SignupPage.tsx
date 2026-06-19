@@ -76,7 +76,10 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
     setSendingCode(true);
     setCodeMsg('');
     try {
-      await sendPhoneCode(form.phone.trim());
+      await sendPhoneCode(
+        form.phone.trim(),
+        socialMode ? 'COMPLETE_SOCIAL_PROFILE' : 'SIGNUP',
+      );
       setCodeSent(true);
       setPhoneVerified(false);
       setCode('');
@@ -94,7 +97,11 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
     setVerifyingCode(true);
     setCodeMsg('');
     try {
-      await verifyPhoneCode(form.phone.trim(), code.trim());
+      await verifyPhoneCode(
+        form.phone.trim(),
+        code.trim(),
+        socialMode ? 'COMPLETE_SOCIAL_PROFILE' : 'SIGNUP',
+      );
       setPhoneVerified(true);
       setCodeTimer(0);
       setCodeMsg('휴대폰 인증이 완료됐어요 ✓');
@@ -173,8 +180,8 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
         email: form.email,
         password: form.password,
       });
-      const { accessToken, refreshToken, name, role } = loginResponse.data.data;
-      saveAuthSession({ accessToken, refreshToken, name, role }, 'local');
+      const { accessToken, name, role } = loginResponse.data.data;
+      saveAuthSession({ accessToken, name, role }, 'local');
       onSignup(name); // 성공 시에만 호출
     } catch (error: unknown) {
       const msg = getErrorMessage(error, '회원가입에 실패했어요');
@@ -196,7 +203,6 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
       if (loginData?.accessToken) {
         saveAuthSession({
           accessToken: loginData.accessToken,
-          refreshToken: loginData.refreshToken,
           name: loginData.name,
           role: loginData.role,
         }, 'local');

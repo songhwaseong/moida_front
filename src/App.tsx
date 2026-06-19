@@ -15,20 +15,22 @@ import SellNoticeModal from './components/SellNoticeModal';
 import { IDLE_OPTIONS, type IdleMinutes } from './pages/admin/adminSettingsOptions';
 import { recordAdminAuditEvent, type AdminAuditEventAction } from './api/adminAuditEvents';
 import { logout as revokeServerSession } from './api/auth';
+import { restoreAuthSession } from './api/axiosInstance';
 import {
   clearAuthSession,
   getAccessToken,
   getAdminUiItem,
   getLoggedInUserName,
+  getUserRole,
   hasAdminAuthSession,
   hasAuthSession,
+  hasPersistedAuthHint,
   isAdminRole,
   removeAdminUiItem,
   saveAuthSession,
   setAdminUiItem,
   setStoredLoginUser,
 } from './utils/authStorage';
-import { consumeOAuthState, type OAuthProvider } from './utils/oauthState';
 import styles from './App.module.css';
 import './styles/global.css';
 
@@ -271,6 +273,7 @@ const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(() => hasAdminSession());
   const [isLoggedIn, setIsLoggedIn] = useState(() => hasAuthSession());
   const [loggedInUserName, setLoggedInUserName] = useState(() => getLoggedInUserName());
+  const [isAuthRestoring, setIsAuthRestoring] = useState(() => hasPersistedAuthHint());
   const [authScreen, setAuthScreen] = useState<AuthScreen>(() => getInitialAuthScreen());
   const [isGuest, setIsGuest] = useState(() => {
     // 소셜 로그인 콜백 URL이면 임시 guest 모드로 시작 → LoginPage 안 보임
@@ -344,6 +347,35 @@ const App: React.FC = () => {
   const adminIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const adminIdleCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adminIdleMinutesRef = useRef(adminIdleMinutes);
+
+  useEffect(() => {
+    if (!hasPersistedAuthHint()) {
+      return;
+    }
+
+    let active = true;
+    void restoreAuthSession().then(restored => {
+      if (!active) return;
+      if (restored) {
+        const admin = isAdminRole(getUserRole());
+        setIsLoggedIn(!admin);
+        setIsAdmin(admin);
+        setLoggedInUserName(getLoggedInUserName());
+        setAuthScreen(null);
+      } else {
+        clearAuthSession();
+        setIsLoggedIn(false);
+        setIsAdmin(false);
+        setAuthScreen(getInitialAuthScreen());
+      }
+    }).finally(() => {
+      if (active) setIsAuthRestoring(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // 현재 폼 화면인지 여부
   const isFormScreen = screen.type === 'sellPage' || editingProduct !== null;
@@ -697,25 +729,20 @@ const App: React.FC = () => {
     const handleSocialCallback = async () => {
       try {
         let endpoint = '';
-        let body: Record<string, string> = { code };
-        let provider: OAuthProvider;
+        const body: Record<string, string> = { code, state: state || '' };
 
         if (path === '/member/kauth') {
           endpoint = '/api/auth/kakaoLogin';
-          provider = 'kakao';
         } else if (path === '/member/nauth') {
           endpoint = '/api/auth/naverLogin';
-          provider = 'naver';
-          body = { code, state: state || '' };
         } else if (path === '/member/gauth') {
           endpoint = '/api/auth/googleLogin';
-          provider = 'google';
         } else {
           return; // 소셜 콜백 URL이 아니면 무시
         }
 
-        // CSRF 방어: 인가 시작 때 저장한 state 와 콜백 state 가 일치하지 않으면 로그인을 중단한다.
-        if (!consumeOAuthState(provider, state)) {
+        // The backend validates the signed HttpOnly OAuth flow cookie and state.
+        if (!state) {
           window.history.replaceState({}, '', '/');
           setIsSocialProcessing(false);
           setIsGuest(false);
@@ -726,6 +753,7 @@ const App: React.FC = () => {
 
         const res = await fetch(endpoint, {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
@@ -746,17 +774,15 @@ const App: React.FC = () => {
           return;
         }
 
-        const { accessToken, refreshToken, name, role, newUser: isNewUser } = data.data;
+        const { accessToken, name, role, newUser: isNewUser } = data.data;
         const authMode = isAdminRole(role) ? 'session' : 'local';
         saveAuthSession({
           accessToken,
-          refreshToken,
           role,
           name: isNewUser ? undefined : name,
           loggedIn: !isNewUser,
         }, authMode);
 
-        // refreshToken 도 함께 보관 — access 만료 시 axios 인터셉터의 자동 갱신에 사용.
         // URL 정리 후 홈으로
         window.history.replaceState({}, '', '/');
 
@@ -1132,6 +1158,8 @@ const App: React.FC = () => {
   };
 
   const isHomePage = screen.type === 'home';
+
+  if (isAuthRestoring) return null;
 
   return (
     <>
