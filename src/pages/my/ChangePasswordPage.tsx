@@ -31,7 +31,7 @@ const ChangePasswordPage: React.FC<Props> = ({ onBack }) => {
         }
         if (key === 'newPw' && touched[key]) {
             if (!newPw) return '새 비밀번호를 입력해주세요';
-            if (newPw.length < 8) return '비밀번호는 8자 이상이어야 해요';
+            if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPw)) return '비밀번호는 영문과 숫자를 포함해 8자 이상이어야 해요';
             if (newPw === currentPw) return '현재 비밀번호와 동일해요';
         }
         if (key === 'confirmPw' && touched[key]) {
@@ -46,7 +46,7 @@ const ChangePasswordPage: React.FC<Props> = ({ onBack }) => {
     const validate = (): boolean => {
         setTouched({ currentPw: true, newPw: true, confirmPw: true });
         if (!currentPw) return false;
-        if (!newPw || newPw.length < 8) return false;
+        if (!newPw || !/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPw)) return false;
         if (newPw === currentPw) return false;
         if (!confirmPw || newPw !== confirmPw) return false;
         return true;

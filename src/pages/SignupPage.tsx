@@ -133,7 +133,7 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
     else if (emailChecked === null) e.email = '이메일 중복 확인을 해주세요';
     else if (!emailChecked) e.email = '이미 사용 중인 이메일이에요';
     if (!form.password) e.password = '비밀번호를 입력해주세요';
-    else if (form.password.length < 8) e.password = '비밀번호는 8자 이상이어야 해요';
+    else if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(form.password)) e.password = '비밀번호는 영문과 숫자를 포함해 8자 이상이어야 해요';
     if (!form.passwordConfirm) e.passwordConfirm = '비밀번호를 다시 입력해주세요';
     else if (form.password !== form.passwordConfirm) e.passwordConfirm = '비밀번호가 일치하지 않아요';
     setErrors(e);
@@ -321,7 +321,7 @@ const SignupPage: React.FC<Props> = ({ onSignup, onGoLogin, socialMode = false, 
                 <input
                   className={`${styles.input} ${errors.password ? styles.inputError : ''}`}
                   type={showPw ? 'text' : 'password'}
-                  placeholder="8자 이상 입력해주세요"
+                  placeholder="영문+숫자 포함 8자 이상"
                   value={form.password}
                   onChange={(e) => set('password', e.target.value)}
                 />
