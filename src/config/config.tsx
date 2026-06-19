@@ -7,7 +7,6 @@ export const KKO_REDIRECT_URI = import.meta.env.VITE_KAKAO_REDIRECT_URI;
 // 네이버 OAuth 설정
 export const NAV_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
 export const NAV_REDIRECT_URI = import.meta.env.VITE_NAVER_REDIRECT_URI;
-export const NAV_STATE = "RANDOM_STATE";                            // CSRF 방지용 고정값
 
 // 구글 OAuth 설정
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;

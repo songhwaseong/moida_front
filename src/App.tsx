@@ -28,6 +28,7 @@ import {
   setAdminUiItem,
   setStoredLoginUser,
 } from './utils/authStorage';
+import { consumeOAuthState, type OAuthProvider } from './utils/oauthState';
 import styles from './App.module.css';
 import './styles/global.css';
 
@@ -697,16 +698,30 @@ const App: React.FC = () => {
       try {
         let endpoint = '';
         let body: Record<string, string> = { code };
+        let provider: OAuthProvider;
 
         if (path === '/member/kauth') {
           endpoint = '/api/auth/kakaoLogin';
+          provider = 'kakao';
         } else if (path === '/member/nauth') {
           endpoint = '/api/auth/naverLogin';
+          provider = 'naver';
           body = { code, state: state || '' };
         } else if (path === '/member/gauth') {
           endpoint = '/api/auth/googleLogin';
+          provider = 'google';
         } else {
           return; // 소셜 콜백 URL이 아니면 무시
+        }
+
+        // CSRF 방어: 인가 시작 때 저장한 state 와 콜백 state 가 일치하지 않으면 로그인을 중단한다.
+        if (!consumeOAuthState(provider, state)) {
+          window.history.replaceState({}, '', '/');
+          setIsSocialProcessing(false);
+          setIsGuest(false);
+          setSocialAuthError('소셜 로그인 보안 검증에 실패했습니다. 다시 시도해주세요.');
+          setAuthScreen('login');
+          return;
         }
 
         const res = await fetch(endpoint, {

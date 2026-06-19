@@ -18,10 +18,10 @@ import {
   KKO_REDIRECT_URI,
   NAV_CLIENT_ID,
   NAV_REDIRECT_URI,
-  NAV_STATE,
 } from '../config/config';
 import type { LoginResponse } from '../types';
 import { isAdminRole, saveAuthSession } from '../utils/authStorage';
+import { createOAuthState } from '../utils/oauthState';
 
 interface Props {
   onLogin: (name?: string) => void;
@@ -245,17 +245,20 @@ const LoginPage: React.FC<Props> = ({ onLogin, onAdmin, onGoSignup, onFindAccoun
   };
 
   const handleKakaoLogin = () => {
-    const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${KKO_CLIENT_ID}&redirect_uri=${KKO_REDIRECT_URI}`;
+    const state = createOAuthState('kakao');
+    const url = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${KKO_CLIENT_ID}&redirect_uri=${KKO_REDIRECT_URI}&state=${state}`;
     window.location.href = url;
   };
 
   const handleNaverLogin = () => {
-    const url = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAV_CLIENT_ID}&redirect_uri=${NAV_REDIRECT_URI}&state=${NAV_STATE}`;
+    const state = createOAuthState('naver');
+    const url = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAV_CLIENT_ID}&redirect_uri=${NAV_REDIRECT_URI}&state=${state}`;
     window.location.href = url;
   };
 
   const handleGoogleLogin = () => {
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&scope=email profile`;
+    const state = createOAuthState('google');
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_REDIRECT_URI}&scope=email profile&state=${state}`;
     window.location.href = url;
   };
 
